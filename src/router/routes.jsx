@@ -1,12 +1,10 @@
-import React from "react";
 import { createBrowserRouter } from "react-router-dom";
 
-
-//Para sa mga layouts ini
+// Layouts
 import MainLayout from "../layouts/MainLayout";
 import AuthLayout from "../layouts/AuthLayout";
 
-//Para sa mga pages ini
+// Pages
 import LandingPage from "../pages/LandingPage";
 import Login from "../pages/admin/Login";
 import AdminDashboard from "../pages/admin/AdminDashboard";
@@ -19,21 +17,22 @@ const routes = createBrowserRouter([
   {
     path: "/",
     element: <MainLayout />,
-    children: [{ index: true, element: <LandingPage /> }],
+    children: [
+      { index: true, element: <LandingPage /> },
+      { path: "login", element: <Login /> },
+    ],
   },
   {
-    path: "/",
+    path: "/admin",
     element: <AuthLayout />,
     children: [
-      { path: "login", element: <Login /> },
-      { path: "admin", element: <AdminDashboard /> },
-      { path: "senior-citizen", element: <SeniorcitizenList /> },
-      {path: "pension", element: <Pension />},
-      {path: "calendar", element: <Calendar />},
-      {path: "settings", element: <Settings />}
+      { index: true, element: <AdminDashboard /> }, // /admin
+      { path: "senior-citizen", element: <SeniorcitizenList /> }, // /admin/senior-citizen
+      { path: "pension", element: <Pension /> }, // /admin/pension
+      { path: "calendar", element: <Calendar /> }, // /admin/calendar
+      { path: "settings", element: <Settings /> }, // /admin/settings
     ],
   },
 ]);
-
 
 export default routes;

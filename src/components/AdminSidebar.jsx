@@ -17,15 +17,15 @@ const AdminSidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
-    { label: "Dashboard", icon: <FaTachometerAlt />, path: "/dashboard" },
-    { label: "Senior Citizen", icon: <FaUser />, path: "/senior-citizen" },
-    { label: "Calendar", icon: <FaCalendarAlt />, path: "/calendar" },
-    { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/pension" },
+    { label: "Dashboard", icon: <FaTachometerAlt />, path: "/admin" },
+    { label: "Senior Citizen", icon: <FaUser />, path: "/admin/senior-citizen" },
+    { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
+    { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
     { label: "Inquiry", icon: <FaInfoCircle />, path: "/inquiry" },
     { label: "Coordinator Tools", icon: <FaTools />, path: "/coordinator-tools" },
     { label: "Policy Admin", icon: <FaCogs />, path: "/policy-admin" },
     { label: "Reports", icon: <FaChartLine />, path: "/reports" },
-    { label: "Settings", icon: <FaCog />, path: "/settings" },
+    { label: "Settings", icon: <FaCog />, path: "/admin/settings" },
   ];
 
   return (
