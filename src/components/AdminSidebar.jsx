@@ -7,6 +7,7 @@ import {
   FaTools,
   FaCogs,
   FaChartLine,
+  FaArchive,
   FaCog,
 } from "react-icons/fa";
 import { NavLink } from "react-router-dom";
@@ -21,10 +22,10 @@ const AdminSidebar = () => {
     { label: "Senior Citizen", icon: <FaUser />, path: "/admin/senior-citizen" },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
     { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
-    { label: "Inquiry", icon: <FaInfoCircle />, path: "/inquiry" },
-    { label: "Coordinator Tools", icon: <FaTools />, path: "/coordinator-tools" },
-    { label: "Policy Admin", icon: <FaCogs />, path: "/policy-admin" },
-    { label: "Reports", icon: <FaChartLine />, path: "/reports" },
+    { label: "Archive Records", icon: <FaArchive  />, path: "/inquiry" },
+    // { label: "Coordinator Tools", icon: <FaTools />, path: "/coordinator-tools" },
+    // { label: "Policy Admin", icon: <FaCogs />, path: "/policy-admin" },
+    // { label: "Reports", icon: <FaChartLine />, path: "/reports" },
     { label: "Settings", icon: <FaCog />, path: "/admin/settings" },
   ];
 

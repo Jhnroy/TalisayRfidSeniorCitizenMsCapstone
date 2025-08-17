@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
+import { FaEye, FaEdit, FaArchive } from "react-icons/fa";
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, push, update, remove } from "firebase/database";
+import { getDatabase, ref, onValue, update, remove, set } from "firebase/database";
 
 // ===== Firebase configuration =====
 const firebaseConfig = {
@@ -26,18 +26,14 @@ const SeniorcitizenList = () => {
   const [ageRangeFilter, setAgeRangeFilter] = useState("All Ages");
   const [pensionStatusFilter, setPensionStatusFilter] = useState("All Status");
 
-  // Modal state
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    age: "",
-    barangay: "",
-    status: "",
-  });
+  // Popup edit & archive state
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isArchivePopupOpen, setIsArchivePopupOpen] = useState(false);
+  const [editData, setEditData] = useState(null);
 
-  // ===== READ =====
+  // ===== READ from registered_uids =====
   const fetchUsers = () => {
-    const seniorRef = ref(db, "seniorCitizens");
+    const seniorRef = ref(db, "registered_uids");
     onValue(seniorRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -52,43 +48,32 @@ const SeniorcitizenList = () => {
     });
   };
 
-  // ===== CREATE =====
-  const handleAddSenior = () => {
-    if (!formData.name || !formData.age || !formData.barangay || !formData.status) {
-      alert("Please fill in all fields.");
-      return;
-    }
-
-    const newSenior = {
-      id: `SC${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`,
-      name: formData.name,
-      age: parseInt(formData.age, 10),
-      barangay: formData.barangay,
-      status: formData.status,
-    };
-
-    push(ref(db, "seniorCitizens"), newSenior);
-    setFormData({ name: "", age: "", barangay: "", status: "" });
-    setShowModal(false);
-  };
-
   // ===== UPDATE =====
   const updateUser = (firebaseId, updatedData) => {
-    update(ref(db, `seniorCitizens/${firebaseId}`), updatedData);
+    update(ref(db, `registered_uids/${firebaseId}`), updatedData);
   };
 
-  // ===== DELETE =====
-  const deleteUser = (firebaseId) => {
-    if (window.confirm("Are you sure you want to delete this senior citizen?")) {
-      remove(ref(db, `seniorCitizens/${firebaseId}`));
-    }
+  // ===== ARCHIVE (popup confirm) =====
+  const confirmArchiveUser = (user) => {
+    setEditData(user);
+    setIsArchivePopupOpen(true);
+  };
+
+  const archiveUser = (firebaseId, userData) => {
+    set(ref(db, `archivedSeniorCitizens/${firebaseId}`), userData).then(() => {
+      remove(ref(db, `registered_uids/${firebaseId}`));
+    });
   };
 
   // ===== FILTERING =====
   const filteredSeniorCitizens = seniorCitizens.filter((sc) => {
     const matchesSearch =
       sc.name.toLowerCase().includes(search.toLowerCase()) ||
-      sc.id.toLowerCase().includes(search.toLowerCase());
+      sc.firebaseId.toLowerCase().includes(search.toLowerCase()) ||
+      (sc.barangay && sc.barangay.toLowerCase().includes(search.toLowerCase())) ||
+      (sc.current_balance && sc.current_balance.toString().includes(search)) ||
+      (sc.status && sc.status.toLowerCase().includes(search.toLowerCase())) ||
+      (sc.age && sc.age.toString().includes(search));
 
     const matchesBarangay =
       barangayFilter === "All Barangays" || sc.barangay === barangayFilter;
@@ -100,7 +85,8 @@ const SeniorcitizenList = () => {
       ageRangeFilter === "All Ages" ||
       (ageRangeFilter === "60-69" && sc.age >= 60 && sc.age <= 69) ||
       (ageRangeFilter === "70-79" && sc.age >= 70 && sc.age <= 79) ||
-      (ageRangeFilter === "80+" && sc.age >= 80);
+      (ageRangeFilter === "80-89" && sc.age >= 80 && sc.age <= 89) ||
+      (ageRangeFilter === "90-100+" && sc.age >= 90);
 
     return (
       matchesSearch && matchesBarangay && matchesPensionStatus && matchesAgeRange
@@ -115,29 +101,21 @@ const SeniorcitizenList = () => {
     Active: "bg-green-100 text-green-700",
     Pending: "bg-yellow-100 text-yellow-700",
     Suspended: "bg-red-100 text-red-700",
+    Claimed: "bg-blue-100 text-blue-700",
+    Unclaimed: "bg-gray-100 text-gray-700",
   };
-
-  const CustomButton = ({ children, className = "", ...props }) => (
-    <button
-      className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
 
   return (
     <main className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Senior Citizens</h1>
-        <CustomButton onClick={() => setShowModal(true)}>+ Add Senior Citizen</CustomButton>
       </div>
 
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <input
           type="text"
-          placeholder="Search by name or ID..."
+          placeholder="Search by UID, Name, Age, Barangay, Balance, or Status..."
           className="border p-2 rounded"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -148,9 +126,21 @@ const SeniorcitizenList = () => {
           onChange={(e) => setBarangayFilter(e.target.value)}
         >
           <option>All Barangays</option>
-          <option>Poblacion</option>
+          <option>Binanuun</option>
+          <option>Caawigan</option>
+          <option>Cahabaan</option>
           <option>Calintaan</option>
-          <option>Poblacion 3</option>
+          <option>Del Carmen</option>
+          <option>Gabon</option>
+          <option>Itomang</option>
+          <option>Poblacion</option>
+          <option>San Francisco</option>
+          <option>San Isidro</option>
+          <option>San Jose</option>
+          <option>San Nicolas</option>
+          <option>Sta. Cruz</option>
+          <option>Sta. Elena</option>
+          <option>Sto. Niño</option>
         </select>
         <select
           className="border p-2 rounded"
@@ -160,7 +150,8 @@ const SeniorcitizenList = () => {
           <option>All Ages</option>
           <option>60-69</option>
           <option>70-79</option>
-          <option>80+</option>
+          <option>80-89</option>
+          <option>90-100+</option>
         </select>
         <select
           className="border p-2 rounded"
@@ -171,6 +162,8 @@ const SeniorcitizenList = () => {
           <option>Active</option>
           <option>Pending</option>
           <option>Suspended</option>
+          <option>Claimed</option>
+          <option>Unclaimed</option>
         </select>
       </div>
 
@@ -179,11 +172,12 @@ const SeniorcitizenList = () => {
         <table className="min-w-full text-sm text-left">
           <thead className="bg-gray-100">
             <tr>
-              <th className="p-3 font-medium">ID</th>
+              <th className="p-3 font-medium">UID</th>
               <th className="p-3 font-medium">Name</th>
               <th className="p-3 font-medium">Age</th>
               <th className="p-3 font-medium">Barangay</th>
-              <th className="p-3 font-medium">Pension Status</th>
+              <th className="p-3 font-medium">Balance</th>
+              <th className="p-3 font-medium">Status</th>
               <th className="p-3 font-medium">Actions</th>
             </tr>
           </thead>
@@ -191,10 +185,11 @@ const SeniorcitizenList = () => {
             {filteredSeniorCitizens.length > 0 ? (
               filteredSeniorCitizens.map((sc) => (
                 <tr key={sc.firebaseId} className="border-t">
-                  <td className="p-3">{sc.id}</td>
+                  <td className="p-3">{sc.firebaseId}</td>
                   <td className="p-3 font-semibold">{sc.name}</td>
                   <td className="p-3">{sc.age}</td>
                   <td className="p-3">{sc.barangay}</td>
+                  <td className="p-3">₱{sc.current_balance}</td>
                   <td className="p-3">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[sc.status]}`}
@@ -207,20 +202,20 @@ const SeniorcitizenList = () => {
                     <FaEdit
                       className="cursor-pointer text-yellow-600"
                       onClick={() => {
-                        const newName = prompt("Enter new name", sc.name);
-                        if (newName) updateUser(sc.firebaseId, { name: newName });
+                        setEditData(sc);
+                        setIsPopupOpen(true);
                       }}
                     />
-                    <FaTrash
-                      className="cursor-pointer text-red-600"
-                      onClick={() => deleteUser(sc.firebaseId)}
+                    <FaArchive
+                      className="cursor-pointer text-gray-600"
+                      onClick={() => confirmArchiveUser(sc)}
                     />
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="6" className="p-3 text-center text-gray-500">
+                <td colSpan="7" className="p-3 text-center text-gray-500">
                   No senior citizens found.
                 </td>
               </tr>
@@ -229,65 +224,157 @@ const SeniorcitizenList = () => {
         </table>
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white p-6 rounded shadow-lg w-96">
-            <h2 className="text-lg font-bold mb-4">Add Senior Citizen</h2>
-
-            <input
-              type="text"
-              name="name"
-              placeholder="Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full border p-2 mb-2 rounded"
-            />
-            <input
-              type="number"
-              name="age"
-              placeholder="Age"
-              value={formData.age}
-              onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-              className="w-full border p-2 mb-2 rounded"
-            />
-            <input
-              type="text"
-              name="barangay"
-              placeholder="Barangay"
-              value={formData.barangay}
-              onChange={(e) => setFormData({ ...formData, barangay: e.target.value })}
-              className="w-full border p-2 mb-2 rounded"
-            />
-            <select
-              name="status"
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full border p-2 mb-4 rounded"
-            >
-              <option value="">Select Pension Status</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Suspended">Suspended</option>
-            </select>
-
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 border rounded"
-                onClick={() => setShowModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-green-600 text-white rounded"
-                onClick={handleAddSenior}
-              >
-                Save
-              </button>
+      {/* Edit Popup */}
+      {isPopupOpen && editData && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 animate-slideDownBounceScale bg-white border rounded-lg shadow-lg p-6 w-[700px] z-50"
+        >
+          <h2 className="text-lg font-semibold mb-4">Edit Senior Citizen</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium">UID</label>
+              <input className="border p-2 rounded w-full bg-gray-100" value={editData.firebaseId} disabled />
             </div>
+            <div>
+              <label className="block text-sm font-medium">Name</label>
+              <input
+                className="border p-2 rounded w-full"
+                value={editData.name}
+                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Age</label>
+              <input
+                type="number"
+                className="border p-2 rounded w-full"
+                value={editData.age}
+                onChange={(e) => setEditData({ ...editData, age: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Barangay</label>
+              <select
+                className="border p-2 rounded w-full"
+                value={editData.barangay}
+                onChange={(e) => setEditData({ ...editData, barangay: e.target.value })}
+              >
+                <option>Binanuun</option>
+                <option>Caawigan</option>
+                <option>Cahabaan</option>
+                <option>Calintaan</option>
+                <option>Del Carmen</option>
+                <option>Gabon</option>
+                <option>Itomang</option>
+                <option>Poblacion</option>
+                <option>San Francisco</option>
+                <option>San Isidro</option>
+                <option>San Jose</option>
+                <option>San Nicolas</option>
+                <option>Sta. Cruz</option>
+                <option>Sta. Elena</option>
+                <option>Sto. Niño</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Balance</label>
+              <input
+                type="number"
+                className="border p-2 rounded w-full"
+                value={editData.current_balance}
+                onChange={(e) => setEditData({ ...editData, current_balance: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Status</label>
+              <select
+                className="border p-2 rounded w-full"
+                value={editData.status}
+                onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+              >
+                <option>Active</option>
+                <option>Pending</option>
+                <option>Suspended</option>
+                <option>Claimed</option>
+                <option>Unclaimed</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              className="px-4 py-2 bg-gray-300 rounded"
+              onClick={() => setIsPopupOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 bg-blue-600 text-white rounded"
+              onClick={() => {
+                updateUser(editData.firebaseId, {
+                  name: editData.name,
+                  age: Number(editData.age),
+                  barangay: editData.barangay,
+                  current_balance: Number(editData.current_balance),
+                  status: editData.status,
+                });
+                setIsPopupOpen(false);
+              }}
+            >
+              Save
+            </button>
           </div>
         </div>
       )}
+
+      {/* Archive Popup */}
+      {isArchivePopupOpen && editData && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 animate-slideDownBounceScale bg-white border rounded-lg shadow-lg p-6 w-[500px] z-50"
+        >
+          <h2 className="text-lg font-semibold mb-4 text-red-600">Archive Senior Citizen</h2>
+          <p>Are you sure you want to archive <span className="font-bold">{editData.name}</span>?</p>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              className="px-4 py-2 bg-gray-300 rounded"
+              onClick={() => setIsArchivePopupOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 bg-red-600 text-white rounded"
+              onClick={() => {
+                archiveUser(editData.firebaseId, editData);
+                setIsArchivePopupOpen(false);
+              }}
+            >
+              Archive
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Animation styles */}
+      <style jsx>{`
+        .animate-slideDownBounceScale {
+          animation: slideDownBounceScale 0.5s ease-in-out;
+        }
+        @keyframes slideDownBounceScale {
+          0% {
+            opacity: 0;
+            transform: translateY(-40px) scale(0.95);
+          }
+          60% {
+            opacity: 1;
+            transform: translateY(10px) scale(1.02);
+          }
+          80% {
+            transform: translateY(-5px) scale(0.99);
+          }
+          100% {
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
     </main>
   );
 };
