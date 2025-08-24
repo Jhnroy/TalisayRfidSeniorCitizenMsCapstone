@@ -1,13 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { initializeApp } from "firebase/app";
-import {
-  getDatabase,
-  ref,
-  onValue,
-  get,
-  set,
-  remove,
-} from "firebase/database";
+import { getDatabase, ref, onValue, get, set, remove } from "firebase/database";
 import { FaIdCard, FaKeyboard, FaInfoCircle } from "react-icons/fa";
 import {
   AiOutlineCheckCircle,
@@ -15,13 +8,33 @@ import {
   AiOutlineCloseCircle,
 } from "react-icons/ai";
 
+/**
+ * Revised full Pension.jsx
+ * - Pure React (JSX)
+ * - Peso formatting (₱2,000.00)
+ * - Responsive: table visible on sm+; card list visible on mobile
+ * - Keeps original Firebase listeners + behavior
+ */
+
+/* ====== Utilities ====== */
+// Format amounts to ₱2,000.00. Accepts numbers or numeric strings.
+const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined || amount === "") return "-";
+  const num = Number(amount);
+  if (isNaN(num)) return amount; // fallback
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    minimumFractionDigits: 2,
+  }).format(num);
+};
 
 const barangays = [
   "Binanuun",
   "Caawigan",
   "Cahabaan",
   "Calintaan",
-  "Del carmen",
+  "Del Carmen",
   "Gabon",
   "Itomang",
   "Poblacion",
@@ -31,8 +44,9 @@ const barangays = [
   "San Nicolas",
   "Sta. Cruz",
   "Sta. Elena",
-  "Sto. Niño"
+  "Sto. Niño",
 ];
+
 // ===== Firebase config =====
 const firebaseConfig = {
   apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
@@ -70,7 +84,7 @@ const headerCell =
   "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600";
 const dataCell = "px-3 py-2 text-sm";
 
-// Helpers
+/* Helpers */
 const toISODate = (d) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -80,8 +94,10 @@ const toISODate = (d) => {
 const computeAge = (isoBirthdate) => {
   if (!isoBirthdate) return null;
   const today = new Date();
-  // accept either "YYYY-MM-DD" or Date object
-  const dob = isoBirthdate instanceof Date ? isoBirthdate : new Date(`${isoBirthdate}T00:00:00`);
+  const dob =
+    isoBirthdate instanceof Date
+      ? isoBirthdate
+      : new Date(`${isoBirthdate}T00:00:00`);
   if (isNaN(dob.getTime())) return null;
   let age = today.getFullYear() - dob.getFullYear();
   const m = today.getMonth() - dob.getMonth();
@@ -104,7 +120,6 @@ const Pension = () => {
 
   // Register modal + form
   const [showModal, setShowModal] = useState(false);
-  const [overlayMode, setOverlayMode] = useState("none"); // "none" | "light" | "dark"
   const [form, setForm] = useState({
     uid: "",
     name: "",
@@ -118,11 +133,15 @@ const Pension = () => {
   // Field warnings / errors
   const [nameWarning, setNameWarning] = useState(""); // orange warning (not blocking)
   const [birthdateError, setBirthdateError] = useState(""); // red error (blocking)
+  const [saving, setSaving] = useState(false);
 
   // Search + Sort
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState("asc"); // 'asc' | 'desc'
+
+  // Input ref for manual focus
+  const manualInputRef = useRef(null);
 
   // ====== Date limits (block picking <60yo) ======
   const today = new Date();
@@ -176,23 +195,18 @@ const Pension = () => {
       setRegisteredSeniors(list);
     });
 
-    // cleanup - onValue returns the unsubscribe function in firebase v9? onValue returns the callback; remove by off
     return () => {
-      // detach listeners by setting null callback
       try {
-        onValue(scannedRef, () => {}); // harmless no-op
-        onValue(unregisterRef, () => {});
-        onValue(regRef, () => {});
-      } catch (e) {
-        // ignore
-      }
+        unsubScanned && unsubScanned();
+        unsubUnreg && unsubUnreg();
+        unsubReg && unsubReg();
+      } catch {}
     };
   }, []);
 
   // ========= Verify UID =========
   const verifyUID = async (uid) => {
     const db = getDatabase(app);
-
     try {
       // Check registered_uids
       const regSnap = await get(ref(db, `registered_uids/${uid}`));
@@ -221,7 +235,7 @@ const Pension = () => {
           balance: "-",
         });
       } else {
-        // Neither registered nor unregistered (still flag as invalid in the log)
+        // Neither registered nor unregistered (still flag as invalid)
         addToRecent({
           name: "Unknown User",
           id: uid,
@@ -278,7 +292,6 @@ const Pension = () => {
       const { uid, name, age, barangay, status, current_balance, birthdate } =
         form;
 
-      // block if birthdate error exists
       if (birthdateError) {
         alert("Fix birthdate error before saving.");
         return;
@@ -302,6 +315,8 @@ const Pension = () => {
         return;
       }
 
+      setSaving(true);
+
       const db = getDatabase(app);
       const payload = {
         name,
@@ -309,19 +324,20 @@ const Pension = () => {
         birthdate,
         barangay,
         status,
+        // store numeric balance
         current_balance: Number(current_balance),
       };
 
       await set(ref(db, `registered_uids/${uid}`), payload);
 
       // Remove from unregister_uid if exists (by key or by value)
-      await remove(ref(db, `unregister_uid/${uid}`));
+      await remove(ref(db, `unregister_uid/${uid}`)).catch(() => {});
       const unregSnap = await get(ref(db, "unregister_uid"));
       if (unregSnap.exists()) {
         const data = unregSnap.val();
         const matchKey = Object.keys(data).find((k) => data[k] === uid);
         if (matchKey) {
-          await remove(ref(db, `unregister_uid/${matchKey}`));
+          await remove(ref(db, `unregister_uid/${matchKey}`)).catch(() => {});
         }
       }
 
@@ -341,6 +357,8 @@ const Pension = () => {
     } catch (err) {
       console.error("handleRegister error:", err);
       alert("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -363,6 +381,14 @@ const Pension = () => {
       const dir = sortDir === "asc" ? 1 : -1;
       const av = a[sortKey];
       const bv = b[sortKey];
+
+      // special-case numeric sorting for current_balance when stored as number or numeric string
+      if (sortKey === "current_balance") {
+        const an = Number(av ?? 0);
+        const bn = Number(bv ?? 0);
+        if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir;
+      }
+
       if (typeof av === "number" && typeof bv === "number") {
         return (av - bv) * dir;
       }
@@ -381,38 +407,9 @@ const Pension = () => {
     }
   };
 
-  // Helper: today's date in YYYY-MM-DD to prevent future birthdates
-  const todayISO = new Date().toISOString().slice(0, 10);
-
   return (
     <main className="p-4 md:p-6 lg:p-8 bg-gray-50 min-h-screen">
       <h1 className="text-2xl font-semibold mb-6">Pension Management</h1>
-
-      {/* overlay mode controls */}
-      {/* <div className="mb-4 flex items-center gap-2">
-        <span className="text-sm text-gray-600">Modal overlay:</span>
-        <button
-          onClick={() => setOverlayMode("none")}
-          className={`px-2 py-1 rounded border ${overlayMode === "none" ? "bg-blue-600 text-white" : ""}`}
-          type="button"
-        >
-          None
-        </button>
-        <button
-          onClick={() => setOverlayMode("light")}
-          className={`px-2 py-1 rounded border ${overlayMode === "light" ? "bg-blue-600 text-white" : ""}`}
-          type="button"
-        >
-          Light
-        </button>
-        <button
-          onClick={() => setOverlayMode("dark")}
-          className={`px-2 py-1 rounded border ${overlayMode === "dark" ? "bg-blue-600 text-white" : ""}`}
-          type="button"
-        >
-          Dark
-        </button>
-      </div> */}
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left Section */}
@@ -439,43 +436,46 @@ const Pension = () => {
               className="mt-1 w-full rounded border-gray-300 shadow-sm"
             >
               <option>All Barangays</option>
-              <option value="Binanuun">Binanuun</option>
-              <option value="Caawigan">Caawigan</option>
-              <option value="Cahabaan">Cahabaan</option>
-              <option value="Calintaan">Calintaan</option>
-              <option value="Del Carmen">Del Carmen</option>
-              <option value="Gabon">Gabon</option>
-              <option value="Itomang">Itomang</option>
-              <option value="Poblacion">Poblacion</option>
-              <option value="San Francisco">San Francisco</option>
-              <option value="San Isidro">San Isidro</option>
-              <option value="San Jose">San Jose</option>
-              <option value="San Nicolas">San Nicolas</option>
-              <option value="Sta. Cruz">Sta. Cruz</option>
-              <option value="Sta. Elena">Sta. Elena</option>
-              <option value="Sto. Niño">Sto. Niño</option>
+              {barangays.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="text-center py-6 border rounded-lg bg-gray-50">
             <FaIdCard className="text-blue-500 mx-auto text-4xl mb-2" />
-            <p className="font-medium text-gray-800">Tap RFID card to verify eligibility</p>
-            <p className="text-sm text-gray-500">Place senior citizen ID card on the reader</p>
+            <p className="font-medium text-gray-800">
+              Tap RFID card to verify eligibility
+            </p>
+            <p className="text-sm text-gray-500">
+              Place senior citizen ID card on the reader
+            </p>
             <div className="mt-3 text-sm text-blue-600">● Reader active and waiting</div>
-            <button className="mt-2 flex items-center mx-auto text-sm text-gray-600 hover:text-blue-600" type="button">
+            <button
+              className="mt-2 flex items-center mx-auto text-sm text-gray-600 hover:text-blue-600"
+              type="button"
+              onClick={() => manualInputRef.current?.focus()}
+            >
               <FaKeyboard className="mr-1" /> Manual ID entry
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="flex gap-2 items-center">
             <input
+              ref={manualInputRef}
+              id="manual-uid"
               type="text"
               placeholder="Enter Senior Citizen UID"
               className="w-full px-3 py-2 border rounded"
               value={seniorId}
               onChange={(e) => setSeniorId(e.target.value)}
             />
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
               Submit
             </button>
           </form>
@@ -486,8 +486,11 @@ const Pension = () => {
             {unregisteredUIDs.length > 0 ? (
               <ul className="text-sm space-y-2">
                 {unregisteredUIDs.map(({ key, uid }) => (
-                  <li key={key} className="flex items-center justify-between border rounded px-3 py-2">
-                    <span className="font-mono text-red-600">{uid}</span>
+                  <li
+                    key={key}
+                    className="flex items-center justify-between border rounded px-3 py-2"
+                  >
+                    <span className="font-mono text-red-600 break-all">{uid}</span>
                     <button
                       onClick={() => openRegisterModal(uid)}
                       className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded"
@@ -514,7 +517,7 @@ const Pension = () => {
             </p>
           </div>
 
-          {/* Registered Seniors table */}
+          {/* Registered Seniors table (desktop/tablet) */}
           <div className="mt-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
               <h3 className="text-lg font-semibold">Registered Seniors</h3>
@@ -527,9 +530,10 @@ const Pension = () => {
               />
             </div>
 
-            <div className="overflow-auto rounded-lg border">
+            {/* Table for sm+ */}
+            <div className="overflow-auto rounded-lg border hidden sm:block">
               <table className="min-w-full bg-white">
-                <thead className="bg-gray-100">
+                <thead className="bg-gray-100 sticky top-0 z-10">
                   <tr>
                     <th className={headerCell}>
                       <button onClick={() => toggleSort("uid")} type="button">UID</button>
@@ -557,25 +561,24 @@ const Pension = () => {
                 <tbody>
                   {filteredSortedSeniors.length > 0 ? (
                     filteredSortedSeniors.map((r) => {
-                      // mark duplicates by checking across all registeredSeniors (case-insensitive trim)
                       const duplicateCount = registeredSeniors.filter(
-                        (s) => (s.name || "").toLowerCase().trim() === (r.name || "").toLowerCase().trim()
+                        (s) =>
+                          (s.name || "").toLowerCase().trim() ===
+                          (r.name || "").toLowerCase().trim()
                       ).length;
                       const isDuplicate = duplicateCount > 1;
 
                       return (
                         <tr key={r.uid} className={`border-b ${isDuplicate ? "bg-orange-100" : ""}`}>
-                          <td className={dataCell}>{r.uid}</td>
+                          <td className={`${dataCell} break-all`}>{r.uid}</td>
                           <td className={`${dataCell} font-medium`}>{r.name}</td>
                           <td className={dataCell}>{r.age}</td>
                           <td className={dataCell}>{r.birthdate || "-"}</td>
                           <td className={dataCell}>{r.barangay}</td>
                           <td className={`${dataCell} ${statusColor[r.status] || ""}`}>
-                            {statusIcon[r.status]} <span className="ml-1 align-middle">{r.status}</span>
+                            {statusIcon[r.status]} <span className="ml-1 align-middle">{r.status || "-"}</span>
                           </td>
-                          <td className={dataCell}>
-                            {typeof r.current_balance === "number" ? r.current_balance.toFixed(2) : r.current_balance ?? "-"}
-                          </td>
+                          <td className={dataCell}>{formatCurrency(r.current_balance)}</td>
                         </tr>
                       );
                     })
@@ -590,6 +593,29 @@ const Pension = () => {
               </table>
             </div>
 
+            {/* Mobile card list for Registered Seniors */}
+            <div className="sm:hidden mt-3 space-y-3">
+              {filteredSortedSeniors.length > 0 ? (
+                filteredSortedSeniors.map((r) => (
+                  <div key={r.uid} className="border rounded-lg p-3 bg-white shadow-sm">
+                    <div className="flex justify-between items-start">
+                      <div className="text-sm font-medium">{r.name}</div>
+                      <div className="text-xs font-mono break-all">{r.uid}</div>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600">
+                      <div>Age: <span className="font-medium">{r.age}</span></div>
+                      <div>Birthdate: <span className="font-medium">{r.birthdate || "-"}</span></div>
+                      <div>Barangay: <span className="font-medium">{r.barangay}</span></div>
+                      <div className={`${statusColor[r.status] || ""} mt-1`}>Status: {r.status}</div>
+                      <div className="mt-1">Balance: <span className="font-medium">{formatCurrency(r.current_balance)}</span></div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-500 py-4 rounded border">No registered seniors found.</div>
+              )}
+            </div>
+
             <p className="text-xs text-gray-500 mt-2">
               Click a column header to sort. Sorting: <b>{sortKey}</b> ({sortDir})
             </p>
@@ -600,7 +626,9 @@ const Pension = () => {
       {/* Recent Verifications Table */}
       <section className="mt-10">
         <h2 className="text-lg font-semibold mb-4">Recent Verifications</h2>
-        <div className="overflow-auto rounded-lg shadow">
+
+        {/* Table for sm+ */}
+        <div className="overflow-auto rounded-lg shadow hidden sm:block">
           <table className="min-w-full bg-white text-sm text-left">
             <thead className="bg-gray-100 text-gray-600 font-medium">
               <tr>
@@ -617,15 +645,13 @@ const Pension = () => {
               {recentVerifications.map((entry, idx) => (
                 <tr key={idx} className="border-b">
                   <td className="px-4 py-3">{entry.name}</td>
-                  <td className="px-4 py-3">{entry.id}</td>
+                  <td className="px-4 py-3 break-all">{entry.id}</td>
                   <td className="px-4 py-3">{entry.barangay}</td>
                   <td className="px-4 py-3">{entry.time}</td>
-                  <td className={`px-4 py-3 font-medium ${statusColor[entry.status]}`}>
+                  <td className={`px-4 py-3 font-medium ${statusColor[entry.status] || ""}`}>
                     {statusIcon[entry.status]} <span className="ml-1">{entry.status}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    {typeof entry.balance === "number" ? entry.balance.toFixed(2) : entry.balance}
-                  </td>
+                  <td className="px-4 py-3">{formatCurrency(entry.balance)}</td>
                   <td className="px-4 py-3">
                     <FaInfoCircle className="text-blue-600 cursor-pointer" />
                   </td>
@@ -633,31 +659,44 @@ const Pension = () => {
               ))}
               {recentVerifications.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-gray-500">
-                    No verifications yet.
-                  </td>
+                  <td colSpan={7} className="px-4 py-6 text-center text-gray-500">No verifications yet.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards for Recent Verifications */}
+        <div className="sm:hidden mt-3 space-y-3">
+          {recentVerifications.length > 0 ? (
+            recentVerifications.map((entry, idx) => (
+              <div key={idx} className="border rounded-lg p-3 bg-white shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div className="text-sm font-medium">{entry.name}</div>
+                  <div className="text-xs font-mono break-all">{entry.id}</div>
+                </div>
+                <div className="mt-2 text-sm text-gray-600">
+                  <div>Barangay: <span className="font-medium">{entry.barangay}</span></div>
+                  <div>Time: <span className="font-medium">{entry.time}</span></div>
+                  <div className={`${statusColor[entry.status] || ""} mt-1`}>Status: {entry.status}</div>
+                  <div className="mt-1">Balance: <span className="font-medium">{formatCurrency(entry.balance)}</span></div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center text-gray-500 py-4 rounded border">No verifications yet.</div>
+          )}
+        </div>
       </section>
 
       {/* Register Modal */}
       {showModal && (
-        <div
-          className={`fixed inset-0 flex items-center justify-center ${
-            overlayMode === "dark"
-              ? "bg-black bg-opacity-50"
-              : overlayMode === "light"
-              ? "bg-white bg-opacity-30 backdrop-blur-sm"
-              : ""
-          }`}
-        >
-          <div className="bg-white shadow-lg p-6 rounded-2xl w-[720px] max-w-full border border-gray-200 animate-slideDownBounceScale">
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white shadow-lg p-6 rounded-2xl w-[720px] max-w-full border border-gray-200 animate-slideDownBounceScale">
             <h2 className="text-lg font-bold mb-4">Register Senior</h2>
 
-            {/* Grid layout: 2 columns (3 fields each) */}
+            {/* Grid layout: 2 columns (stacked on mobile) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Column 1 */}
               <div>
@@ -671,7 +710,6 @@ const Pension = () => {
                     className="w-full border p-2 rounded bg-gray-100 cursor-not-allowed text-gray-600"
                   />
                 </div>
-
 
                 {/* Name */}
                 <div className="mb-3">
@@ -688,9 +726,7 @@ const Pension = () => {
                       );
 
                       if (duplicate) {
-                        setNameWarning(
-                          "⚠️ Another senior has this name. UID will still make the record unique."
-                        );
+                        setNameWarning("⚠️ Another senior has this name. UID will still make the record unique.");
                       } else {
                         setNameWarning("");
                       }
@@ -741,21 +777,19 @@ const Pension = () => {
               {/* Column 2 */}
               <div>
                 {/* Barangay */}
-               <div className="mb-3">
-                <label className="text-xs text-gray-600">Barangay</label>
-                <select
-                  value={form.barangay}
-                  onChange={(e) => setForm({ ...form, barangay: e.target.value })}
-                  className="w-full border p-2 rounded bg-white"
-                >
-                  <option value="">Select Barangay</option>
-                  {barangays.map((brgy) => (
-                    <option key={brgy} value={brgy}>
-                      {brgy}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div className="mb-3">
+                  <label className="text-xs text-gray-600">Barangay</label>
+                  <select
+                    value={form.barangay}
+                    onChange={(e) => setForm({ ...form, barangay: e.target.value })}
+                    className="w-full border p-2 rounded bg-white"
+                  >
+                    <option value="">Select Barangay</option>
+                    {barangays.map((brgy) => (
+                      <option key={brgy} value={brgy}>{brgy}</option>
+                    ))}
+                  </select>
+                </div>
 
                 {/* Status */}
                 <div className="mb-3">
@@ -783,6 +817,7 @@ const Pension = () => {
                     onChange={(e) => setForm({ ...form, current_balance: e.target.value })}
                     className="w-full border p-2 rounded"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Preview: {formatCurrency(form.current_balance)}</p>
                 </div>
               </div>
             </div>
@@ -792,45 +827,35 @@ const Pension = () => {
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-300 rounded"
+                disabled={saving}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleRegister}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
+                className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-60"
+                disabled={saving}
               >
-                Save
+                {saving ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
 
-          {/* Animation CSS included locally */}
+          {/* Animation CSS */}
           <style>{`
             .animate-slideDownBounceScale {
               animation: slideDownBounceScale 0.5s ease-in-out;
             }
             @keyframes slideDownBounceScale {
-              0% {
-                opacity: 0;
-                transform: translateY(-40px) scale(0.95);
-              }
-              60% {
-                opacity: 1;
-                transform: translateY(10px) scale(1.02);
-              }
-              80% {
-                transform: translateY(-5px) scale(0.99);
-              }
-              100% {
-                transform: translateY(0) scale(1);
-              }
+              0% { opacity: 0; transform: translateY(-40px) scale(0.95); }
+              60% { opacity: 1; transform: translateY(10px) scale(1.02); }
+              80% { transform: translateY(-5px) scale(0.99); }
+              100% { transform: translateY(0) scale(1); }
             }
           `}</style>
         </div>
       )}
-
-      
     </main>
   );
 };
