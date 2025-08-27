@@ -1,14 +1,24 @@
 import { useState } from "react";
+import { signOut } from "firebase/auth";
+import { auth } from "../../router/Firebase";
+import { useNavigate } from "react-router-dom";
 
 const Settings = () => {
   const [theme, setTheme] = useState("light");
   const [dateFormat, setDateFormat] = useState("MM/DD/YYYY");
   const [timeFormat, setTimeFormat] = useState("12-hour");
   const [landingPage, setLandingPage] = useState("Dashboard");
+  const navigate = useNavigate();
 
-  const handleLogout = () => {
-    // TODO: Add Firebase logout
-    console.log("Logging out...");
+  const handleLogout = async () => {
+    try {
+      await signOut(auth); // ✅ Firebase logout
+      console.log("Successfully logged out");
+      navigate("/login"); // ✅ Redirect to login page
+    } catch (error) {
+      console.error("Logout failed:", error.message);
+      alert("Failed to log out. Please try again.");
+    }
   };
 
   return (
@@ -98,9 +108,9 @@ const Settings = () => {
           </div>
           <button
             onClick={handleLogout}
-            className="mt-4 md:mt-0 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+            className="mt-4 md:mt-0 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition"
           >
-             Log Out
+            Log Out
           </button>
         </div>
       </section>

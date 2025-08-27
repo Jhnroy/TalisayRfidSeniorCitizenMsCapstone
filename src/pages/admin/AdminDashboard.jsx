@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
-import { FaUserPlus, FaMoneyBillWave, FaCheckCircle, FaFileAlt } from "react-icons/fa";
+import {
+  FaMoneyBillWave,
+  FaCheckCircle,
+  FaFileAlt,
+} from "react-icons/fa";
 import { FiUsers, FiCheck, FiClock } from "react-icons/fi";
 import { HiOutlineCreditCard } from "react-icons/hi2";
-import { MdOutlineEventNote, MdOutlineVerifiedUser, MdOutlineCake } from "react-icons/md";
+import {
+  MdOutlineEventNote,
+  MdOutlineVerifiedUser,
+  MdOutlineCake,
+} from "react-icons/md";
 
 // Firebase
 import { initializeApp } from "firebase/app";
@@ -12,7 +20,8 @@ import { getDatabase, ref, onValue } from "firebase/database";
 const firebaseConfig = {
   apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
   authDomain: "rfidseniorcitizenms.firebaseapp.com",
-  databaseURL: "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL:
+    "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "rfidseniorcitizenms",
   storageBucket: "rfidseniorcitizenms.firebasestorage.app",
   messagingSenderId: "412368953505",
@@ -32,6 +41,7 @@ const AdminDashboard = () => {
     payout: 0,
   });
 
+  // Fetch senior citizen stats
   useEffect(() => {
     const archivedRef = ref(db, "archivedSeniorCitizens");
     const registeredRef = ref(db, "registered_uids");
@@ -43,7 +53,8 @@ const AdminDashboard = () => {
           accumulated.total += 1;
           if (citizen.status === "Claimed") accumulated.active += 1;
           if (citizen.status === "Unclaimed") accumulated.pending += 1;
-          if (citizen.current_balance) accumulated.payout += Number(citizen.current_balance);
+          if (citizen.current_balance)
+            accumulated.payout += Number(citizen.current_balance);
         });
       }
       return accumulated;
@@ -52,10 +63,9 @@ const AdminDashboard = () => {
     const fetchData = () => {
       let statsAccumulator = { total: 0, active: 0, pending: 0, payout: 0 };
 
-      // Archived Citizens
       onValue(archivedRef, (snapshot) => {
         let updatedStats = processData(snapshot, { ...statsAccumulator });
-        // Registered Citizens
+
         onValue(registeredRef, (snapshot2) => {
           updatedStats = processData(snapshot2, updatedStats);
           setStats(updatedStats);
@@ -94,7 +104,9 @@ const AdminDashboard = () => {
         <div className="bg-white shadow rounded-lg p-4 flex items-center justify-between">
           <div>
             <p className="text-gray-600">Monthly Payout</p>
-            <h2 className="text-2xl font-bold">₱{stats.payout.toLocaleString()}</h2>
+            <h2 className="text-2xl font-bold">
+              ₱{stats.payout.toLocaleString()}
+            </h2>
           </div>
           <HiOutlineCreditCard className="text-orange-500 text-3xl" />
         </div>
@@ -135,21 +147,25 @@ const AdminDashboard = () => {
               <MdOutlineVerifiedUser className="text-gray-500 mt-1" />
               <div>
                 <p>Verification Drive</p>
-                <small className="text-gray-500">March 18, 2025 - 8:00 AM</small>
+                <small className="text-gray-500">
+                  March 18, 2025 - 8:00 AM
+                </small>
               </div>
             </li>
             <li className="flex items-start gap-2">
               <MdOutlineCake className="text-gray-500 mt-1" />
               <div>
                 <p>Birthday Celebration</p>
-                <small className="text-gray-500">March 20, 2025 - 2:00 PM</small>
+                <small className="text-gray-500">
+                  March 20, 2025 - 2:00 PM
+                </small>
               </div>
             </li>
           </ul>
         </div>
       </div>
 
-      {/* Quick Actions (Removed Add Senior Citizen) */}
+      {/* Quick Actions */}
       <div className="bg-white shadow rounded-lg p-4">
         <h3 className="font-semibold text-lg mb-4">Quick Actions</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
