@@ -1,14 +1,23 @@
-import React, { useState } from "react";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import React, { useState, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+  setPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
 import { getDatabase, ref, get } from "firebase/database";
 import { useNavigate } from "react-router-dom";
-import { initializeApp } from "firebase/app";
-import { FaEye, FaEyeSlash } from "react-icons/fa"; // ✅ React Icons
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
+// ✅ Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
   authDomain: "rfidseniorcitizenms.firebaseapp.com",
-  databaseURL: "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL:
+    "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "rfidseniorcitizenms",
   storageBucket: "rfidseniorcitizenms.firebasestorage.app",
   messagingSenderId: "412368953505",
@@ -18,7 +27,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const database = getDatabase(app);
+const db = getDatabase(app);
 
 const Login = () => {
   const navigate = useNavigate();
@@ -28,45 +37,79 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ Centralized redirect based on role
+  const redirectBasedOnRole = (role) => {
+    const normalizedRole = (role || "").toUpperCase().trim();
+
+    if (normalizedRole === "MSWD") navigate("/super-admin", { replace: true });
+    else if (normalizedRole === "OSCA") navigate("/admin", { replace: true });
+    else if (normalizedRole === "DSWD") navigate("/dswd-admin", { replace: true });
+    else setError("⚠️ Unknown role. Contact administrator.");
+  };
+
+  // ✅ Restore session per browser session
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const snapshot = await get(ref(db, `users/${user.uid}`));
+          if (snapshot.exists()) {
+            const role = snapshot.val().role;
+            redirectBasedOnRole(role);
+          } else {
+            setError("⚠️ User record missing in database.");
+          }
+        } catch (err) {
+          console.error("🔥 Session restore error:", err);
+          setError("⚠️ Failed to fetch user role.");
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // ✅ Handle login per session
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
+      // ✅ Ensure login is per session
+      await setPersistence(auth, browserSessionPersistence);
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Check role in DB
-      const snapshot = await get(ref(database, "adminUsers/" + user.uid));
-
+      const snapshot = await get(ref(db, `users/${user.uid}`));
       if (snapshot.exists()) {
-        const userData = snapshot.val();
-        if (userData.role === "admin") {
-          navigate("/admin"); // Go to Admin Dashboard
-        } else {
-          setError("Access denied. Admins only!");
-        }
+        const role = snapshot.val().role;
+        redirectBasedOnRole(role);
       } else {
-        setError("Account not found in admin records.");
+        setError("❌ User record not found in database.");
       }
     } catch (err) {
-      if (err.code === "auth/user-not-found") {
-        setError("User not found.");
-      } else if (err.code === "auth/wrong-password") {
-        setError("Invalid password.");
-      } else {
-        setError("Login failed. Try again.");
-      }
+      console.error("🔥 Login error:", err);
+      if (err.code === "auth/user-not-found") setError("❌ User not found.");
+      else if (err.code === "auth/wrong-password") setError("❌ Wrong password.");
+      else if (err.code === "auth/invalid-email") setError("❌ Invalid email.");
+      else setError(`❌ Login failed: ${err.code}`);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/login", { replace: true });
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#eef3fc] px-4">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">Admin Login</h2>
+        <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
+          System Login
+        </h2>
 
         {error && <p className="text-red-600 text-center mb-4">{error}</p>}
 
@@ -75,7 +118,7 @@ const Login = () => {
             <label className="block text-sm font-medium text-gray-700">Email</label>
             <input
               type="email"
-              placeholder="Enter your admin email"
+              placeholder="Enter your email"
               className="mt-1 block w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -112,10 +155,22 @@ const Login = () => {
 
         <p className="mt-6 text-center text-gray-600">
           Don’t have an account?{" "}
-          <button onClick={() => navigate("/signup")} className="text-blue-600 hover:underline">
-            Create Admin
+          <button
+            onClick={() => navigate("/signup")}
+            className="text-blue-600 hover:underline"
+          >
+            Sign Up
           </button>
         </p>
+
+        <div className="mt-4 text-center">
+          <button
+            onClick={handleLogout}
+            className="text-red-500 underline text-sm"
+          >
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );

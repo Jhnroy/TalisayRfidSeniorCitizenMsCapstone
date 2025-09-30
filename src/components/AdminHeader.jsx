@@ -19,7 +19,7 @@ const AdminHeader = ({ setSidebarOpen }) => {
           name: user.displayName?.trim() || user.email.split("@")[0], // Fallback to email prefix
           email: user.email,
           photo: user.photoURL || null,
-          role: "Admin",
+          role: "OSCA",
         });
       } else {
         setAdminInfo(null);
@@ -41,7 +41,7 @@ const AdminHeader = ({ setSidebarOpen }) => {
           <FaBars />
         </button>
         <img src={TalisayLogo} alt="Logo" className="h-10" />
-        <h1 className="text-xl font-semibold text-gray-800">Admin Dashboard</h1>
+        <h1 className="text-xl font-semibold text-gray-800">OSCA Dashboard</h1>
       </div>
 
       {/* Right Section: Admin Info */}

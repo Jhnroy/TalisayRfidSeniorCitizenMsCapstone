@@ -12,9 +12,9 @@ const Settings = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth); // ✅ Firebase logout
+      await signOut(auth); // Firebase logout
       console.log("Successfully logged out");
-      navigate("/login"); // ✅ Redirect to login page
+      navigate("/login"); // Redirect to login page
     } catch (error) {
       console.error("Logout failed:", error.message);
       alert("Failed to log out. Please try again.");

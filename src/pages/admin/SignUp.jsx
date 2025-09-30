@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { getDatabase, ref, set } from "firebase/database";
+import { getDatabase, ref, set, get, child } from "firebase/database";
 import { useNavigate } from "react-router-dom";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid"; // ✅ New Import
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/solid";
 
-// Firebase Config
+// ✅ Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
   authDomain: "rfidseniorcitizenms.firebaseapp.com",
@@ -17,7 +17,7 @@ const firebaseConfig = {
   measurementId: "G-KGRDKXYP4S",
 };
 
-// Initialize Firebase
+// ✅ Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const database = getDatabase(app);
@@ -46,23 +46,39 @@ const SignUp = () => {
     try {
       setLoading(true);
 
-      // Create account in Firebase Auth
+      // Step 1: Check kung may users na sa DB
+      const dbRef = ref(database);
+      const snapshot = await get(child(dbRef, "users"));
+
+      let role = "OSCA"; // default role
+
+      // ✅ Fixed Rules
+      if (email.toLowerCase() === "mswd@gmail.com") {
+        role = "MSWD";
+      } else if (email.toLowerCase() === "dswd@gmail.com") {
+        role = "DSWD";
+      } else if (!snapshot.exists()) {
+        // ✅ Fallback: kung wala pang user sa DB, first signup = MSWD
+        role = "MSWD";
+      }
+
+      // Step 2: Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Save user in Realtime DB
-      await set(ref(database, "adminUsers/" + user.uid), {
+      // Step 3: Save user details in Realtime DB
+      await set(ref(database, "users/" + user.uid), {
         email: user.email,
-        role: "admin",
+        role: role,
         createdAt: new Date().toISOString(),
       });
 
-      setSuccess("Admin account created successfully!");
+      setSuccess(`Account created successfully as ${role}!`);
       setEmail("");
       setPassword("");
       setConfirmPassword("");
 
-      // Redirect after success
+      // Step 4: Redirect to login
       setTimeout(() => navigate("/login"), 2000);
 
     } catch (err) {
@@ -84,10 +100,10 @@ const SignUp = () => {
     <div className="min-h-screen flex items-center justify-center bg-[#eef3fc] px-4">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md sm:max-w-lg md:max-w-xl">
         <h2 className="text-2xl md:text-3xl font-bold text-gray-800 text-center mb-2">
-          Create Admin Account
+          Create Account
         </h2>
         <p className="text-sm text-gray-500 text-center mb-6">
-          Sign up to manage senior citizen records and services.
+          Sign up to access the Senior Citizens Management System.
         </p>
 
         {/* Error & Success */}

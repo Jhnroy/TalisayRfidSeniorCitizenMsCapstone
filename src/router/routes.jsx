@@ -1,112 +1,120 @@
-import React, { useEffect, useState } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { auth } from "./Firebase";
-import { onAuthStateChanged } from "firebase/auth";
 
 // Layouts
 import MainLayout from "../layouts/MainLayout";
-import AuthLayout from "../layouts/AuthLayout";
+import AdminLayout from "../layouts/AdminLayout";           // OSCA
+import SuperAdminLayout from "../layouts/SuperAdminLayout"; // MSWD
+import DswdLayout from "../layouts/DswdLayout";             // DSWD
+
+// Components
+import ProtectedRoute from "../components/ProtectedRoute";
 
 // Pages
 import LandingPage from "../pages/LandingPage";
 import Login from "../pages/admin/Login";
 import SignUp from "../pages/admin/SignUp";
+
+// Admin (OSCA)
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import SeniorcitizenList from "../pages/admin/SeniorcitizenList";
+import Pending from "../pages/admin/Pending";
+import AddNewMembers from "../pages/admin/AddNewMembers";
 import Pension from "../pages/admin/Pension";
+import Archive from "../pages/admin/Archive";
 import Calendar from "../pages/admin/Calendar";
 import Settings from "../pages/admin/Settings";
-import NotFound from "../pages/NotFound"; // ✅ Added custom 404 page
 
-// ==============================
-// 🔒 Protected Route Component
-// ==============================
-const ProtectedRoute = ({ children }) => {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+// Super Admin (MSWD)
+import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
+import Registrants from "../pages/superAdmin/Registrants";
+import Validation from "../pages/superAdmin/Validation";
+import RfidBinding from "../pages/superAdmin/RfidBinding";
+import Masterlist from "../pages/superAdmin/Masterlist";
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+// DSWD
+import DswdDashboard from "../pages/dswdPage/DswdDashboard";
 
-    return () => unsubscribe();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-100">
-        <h1 className="text-xl font-semibold">Checking authentication...</h1>
-      </div>
-    );
-  }
-
-  return user ? children : <Navigate to="/login" />;
-};
+// Not Found
+import NotFound from "../pages/NotFound";
 
 // ==============================
 // 📌 Routes Setup
 // ==============================
 const routes = createBrowserRouter([
+  // ------------------------------
+  // Public Routes
+  // ------------------------------
   {
     path: "/",
     element: <MainLayout />,
-    errorElement: <NotFound />, // ✅ Added
+    errorElement: <NotFound />,
     children: [
       { index: true, element: <LandingPage /> },
       { path: "login", element: <Login /> },
       { path: "signup", element: <SignUp /> },
     ],
   },
+
+  // ------------------------------
+  // OSCA Admin (Moderator)
+  // ------------------------------
   {
     path: "/admin",
-    element: <AuthLayout />,
-    errorElement: <NotFound />, // ✅ Added
+    element: (
+      <ProtectedRoute allowedRoles={["OSCA"]}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
     children: [
-      {
-        index: true,
-        element: (
-          <ProtectedRoute>
-            <AdminDashboard />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "senior-citizen",
-        element: (
-          <ProtectedRoute>
-            <SeniorcitizenList />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "pension",
-        element: (
-          <ProtectedRoute>
-            <Pension />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "calendar",
-        element: (
-          <ProtectedRoute>
-            <Calendar />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "settings",
-        element: (
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        ),
-      },
+      { index: true, element: <AdminDashboard /> },
+      { path: "senior-citizen", element: <SeniorcitizenList /> },
+      { path: "pending", element: <Pending /> },
+      { path: "add-member", element: <AddNewMembers /> },
+      { path: "pension", element: <Pension /> },
+      { path: "archive", element: <Archive /> },
+      { path: "calendar", element: <Calendar /> },
+      { path: "settings", element: <Settings /> },
     ],
   },
-  // ✅ Catch-all route for undefined URLs
+
+  // ------------------------------
+  // MSWD Super Admin
+  // ------------------------------
+  {
+    path: "/super-admin",
+    element: (
+      <ProtectedRoute allowedRoles={["MSWD"]}>
+        <SuperAdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <SuperAdminDashboard /> },
+      { path: "registrants", element: <Registrants /> },
+      { path: "validation", element: <Validation /> },
+      { path: "calendar", element: <Calendar /> },
+      { path: "rfid-binding", element: <RfidBinding /> },
+      { path: "masterlist", element: <Masterlist /> },
+    ],
+  },
+
+  // ------------------------------
+  // DSWD Admin
+  // ------------------------------
+  {
+    path: "/dswd-admin",
+    element: (
+      <ProtectedRoute allowedRoles={["DSWD"]}>
+        <DswdLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <DswdDashboard /> },
+    ],
+  },
+
+  // ------------------------------
+  // Catch-all 404
+  // ------------------------------
   {
     path: "*",
     element: <NotFound />,

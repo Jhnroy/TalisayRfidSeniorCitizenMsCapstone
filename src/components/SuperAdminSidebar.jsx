@@ -1,43 +1,44 @@
 import {
   FaTachometerAlt,
-  FaUser,
+  FaUserPlus,
   FaCalendarAlt,
-  FaMoneyCheckAlt,
-  FaArchive,
+  FaCheckCircle,
+  FaFileAlt,
+  FaUsersCog,
+  FaChartLine,
   FaCog,
 } from "react-icons/fa";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { HiMenu } from "react-icons/hi";
 import { FiChevronDown, FiChevronUp } from "react-icons/fi";
-import { FaClock, FaUserPlus } from "react-icons/fa";
 
-const AdminSidebar = () => {
+const SuperAdminSidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [registrantOpen, setRegistrantOpen] = useState(false);
 
   const menuItems = [
-    { label: "Dashboard", icon: <FaTachometerAlt />, path: "/admin", exact: true },
+    { label: "Dashboard", icon: <FaTachometerAlt />, path: "/super-admin", exact: true },
     {
       label: "Registrants",
-      icon: <FaUser />,
-      path: "/admin/senior-citizen",
+      icon: <FaUserPlus />,
+      path: "/super-admin/registrants",
       exact: true,
       subMenu: [
-        // { label: "Pending Lists", icon: <FaClock />, path: "/admin/pending" },
-        { label: "Validation", icon: <FaUserPlus />, path: "/admin/add-member" },
+        { label: "Validation", icon: <FaCheckCircle />, path: "/super-admin/validation" },
       ],
     },
-    { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
-    { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
-    
-    { label: "Archive Records", icon: <FaArchive />, path: "/admin/archive" },
-    { label: "Settings", icon: <FaCog />, path: "/admin/settings" },
+    { label: "Calendar", icon: <FaCalendarAlt />, path: "/super-admin/calendar" },
+    {label: "RFID Binding", icon: <FaFileAlt />, path: "/super-admin/rfid-binding", exact: true},
+    { label: "Masterlist", icon: <FaFileAlt />, path: "/super-admin/masterlist" },
+    // { label: "Admin Management", icon: <FaUsersCog />, path: "/super-admin/admin-management" },
+    // { label: "Reports", icon: <FaChartLine />, path: "/super-admin/reports" },
+    // { label: "Settings", icon: <FaCog />, path: "/super-admin/settings" },
   ];
 
   return (
     <>
-      {/* Toggle button for mobile */}
+      {/* Mobile toggle button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="md:hidden fixed top-4 left-4 z-50 bg-white p-2 rounded shadow"
@@ -45,7 +46,7 @@ const AdminSidebar = () => {
         <HiMenu className="text-2xl text-gray-700" />
       </button>
 
-      {/* Backdrop when sidebar is open on mobile */}
+      {/* Backdrop for mobile */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-30 z-40"
@@ -59,15 +60,19 @@ const AdminSidebar = () => {
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
+        <div className="p-4 border-b">
+          <h1 className="text-2xl font-bold">MSWDO Admin</h1>
+          <p className="text-sm text-gray-500">Super Admin Dashboard</p>
+        </div>
+
         <ul className="pt-4">
           {menuItems.map(({ label, icon, path, subMenu, exact }) =>
             subMenu ? (
               <li key={label}>
                 <div className="flex items-center justify-between">
-                  {/* Parent link (Registrants main page) */}
                   <NavLink
                     to={path}
-                    end={exact} // ✅ exact match
+                    end={exact}
                     onClick={() => setIsOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-2 px-4 py-2 w-full rounded-md transition-colors duration-200 ${
@@ -81,7 +86,7 @@ const AdminSidebar = () => {
                     <span>{label}</span>
                   </NavLink>
 
-                  {/* Arrow toggle ONLY */}
+                  {/* Arrow toggle */}
                   <button
                     onClick={() => setRegistrantOpen(!registrantOpen)}
                     className="px-2 text-gray-600 hover:text-orange-500"
@@ -117,7 +122,7 @@ const AdminSidebar = () => {
               <NavLink
                 key={path}
                 to={path}
-                end={exact} // ✅ exact match
+                end={exact}
                 onClick={() => setIsOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-2 px-4 py-2 rounded-md transition-colors duration-200 ${
@@ -138,4 +143,4 @@ const AdminSidebar = () => {
   );
 };
 
-export default AdminSidebar;
+export default SuperAdminSidebar;
