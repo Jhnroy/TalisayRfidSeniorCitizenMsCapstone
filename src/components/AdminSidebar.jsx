@@ -5,6 +5,7 @@ import {
   FaMoneyCheckAlt,
   FaArchive,
   FaCog,
+  FaFileAlt,
 } from "react-icons/fa";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
@@ -24,15 +25,16 @@ const AdminSidebar = () => {
       path: "/admin/senior-citizen",
       exact: true,
       subMenu: [
-        // { label: "Pending Lists", icon: <FaClock />, path: "/admin/pending" },
-        { label: "Validation", icon: <FaUserPlus />, path: "/admin/add-member" },
+        { label: "Validation", icon: <FaUserPlus />, path: "/admin/admin-registrants" },
       ],
     },
-    { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
+    { label: "Masterlist", icon: <FaFileAlt />, path: "/admin/admin-masterlist" },
     { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
+    { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
     
-    { label: "Archive Records", icon: <FaArchive />, path: "/admin/archive" },
-    { label: "Settings", icon: <FaCog />, path: "/admin/settings" },
+    
+    // { label: "Archive Records", icon: <FaArchive />, path: "/admin/archive" },
+    // { label: "Settings", icon: <FaCog />, path: "/admin/settings" },
   ];
 
   return (

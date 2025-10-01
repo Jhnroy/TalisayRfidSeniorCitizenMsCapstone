@@ -18,21 +18,26 @@ import SignUp from "../pages/admin/SignUp";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import SeniorcitizenList from "../pages/admin/SeniorcitizenList";
 import Pending from "../pages/admin/Pending";
-import AddNewMembers from "../pages/admin/AddNewMembers";
+import AdminRegistrants from "../pages/admin/AdminRegistrant";
 import Pension from "../pages/admin/Pension";
 import Archive from "../pages/admin/Archive";
 import Calendar from "../pages/admin/Calendar";
 import Settings from "../pages/admin/Settings";
+import AdminMasterlist from "../pages/admin/AdminMasterlist";
 
 // Super Admin (MSWD)
 import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
-import Registrants from "../pages/superAdmin/Registrants";
+import SuperAdminRegistrants from "../pages/superAdmin/SuperAdminRegistrants";
 import Validation from "../pages/superAdmin/Validation";
 import RfidBinding from "../pages/superAdmin/RfidBinding";
 import Masterlist from "../pages/superAdmin/Masterlist";
 
 // DSWD
-import DswdDashboard from "../pages/dswdPage/DswdDashboard";
+
+import DswdMasterlist from "../pages/dswdPage/DswdMasterlist";
+import DswdPension from "../pages/dswdPage/DswdPension";
+import DswdValidation from "../pages/dswdPage/DswdValidation";
+
 
 // Not Found
 import NotFound from "../pages/NotFound";
@@ -69,7 +74,8 @@ const routes = createBrowserRouter([
       { index: true, element: <AdminDashboard /> },
       { path: "senior-citizen", element: <SeniorcitizenList /> },
       { path: "pending", element: <Pending /> },
-      { path: "add-member", element: <AddNewMembers /> },
+      { path: "admin-registrants", element: <AdminRegistrants /> },
+      { path: "admin-masterlist", element: <AdminMasterlist /> },
       { path: "pension", element: <Pension /> },
       { path: "archive", element: <Archive /> },
       { path: "calendar", element: <Calendar /> },
@@ -89,7 +95,7 @@ const routes = createBrowserRouter([
     ),
     children: [
       { index: true, element: <SuperAdminDashboard /> },
-      { path: "registrants", element: <Registrants /> },
+      { path: "registrants", element: <SuperAdminRegistrants /> },
       { path: "validation", element: <Validation /> },
       { path: "calendar", element: <Calendar /> },
       { path: "rfid-binding", element: <RfidBinding /> },
@@ -108,7 +114,9 @@ const routes = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <DswdDashboard /> },
+      { index: true, element: <DswdMasterlist /> },
+      { path: "dswd-pension", element: <DswdPension /> },
+      { path: "dswd-validation", element: <DswdValidation /> },
     ],
   },
 

@@ -21,7 +21,7 @@ const Header = () => {
           if (snapshot.exists()) {
             const data = snapshot.val();
             setUserInfo({
-              name: data.name || "Unknown",
+              name: data.name || "DSWD-Admin",
               role: data.role?.toUpperCase() || "N/A", // ✅ exact role from DB
               email: user.email,
             });
@@ -43,10 +43,7 @@ const Header = () => {
     return () => unsubscribe();
   }, []);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    window.location.href = "/login"; // redirect after logout
-  };
+  
 
   // ✅ Dynamic dashboard title based on role
   const dashboardTitle =
@@ -67,13 +64,6 @@ const Header = () => {
           <p className="text-sm">{userInfo.role}</p>
           <p className="text-xs text-gray-200">{userInfo.email}</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-3 py-1 rounded-md text-sm"
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
       </div>
     </header>
   );

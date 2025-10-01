@@ -24,9 +24,9 @@ const SuperAdminSidebar = () => {
       icon: <FaUserPlus />,
       path: "/super-admin/registrants",
       exact: true,
-      subMenu: [
-        { label: "Validation", icon: <FaCheckCircle />, path: "/super-admin/validation" },
-      ],
+      // subMenu: [
+      //   { label: "Validation", icon: <FaCheckCircle />, path: "/super-admin/validation" },
+      // ],
     },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/super-admin/calendar" },
     {label: "RFID Binding", icon: <FaFileAlt />, path: "/super-admin/rfid-binding", exact: true},
