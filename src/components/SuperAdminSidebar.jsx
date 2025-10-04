@@ -19,15 +19,15 @@ const SuperAdminSidebar = () => {
 
   const menuItems = [
     { label: "Dashboard", icon: <FaTachometerAlt />, path: "/super-admin", exact: true },
-    {
-      label: "Registrants",
-      icon: <FaUserPlus />,
-      path: "/super-admin/registrants",
-      exact: true,
-      // subMenu: [
-      //   { label: "Validation", icon: <FaCheckCircle />, path: "/super-admin/validation" },
-      // ],
-    },
+    // {
+    //   label: "Registrants",
+    //   icon: <FaUserPlus />,
+    //   path: "/super-admin/registrants",
+    //   exact: true,
+    //   // subMenu: [
+    //   //   { label: "Validation", icon: <FaCheckCircle />, path: "/super-admin/validation" },
+    //   // ],
+    // },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/super-admin/calendar" },
     {label: "RFID Binding", icon: <FaFileAlt />, path: "/super-admin/rfid-binding", exact: true},
     { label: "Masterlist", icon: <FaFileAlt />, path: "/super-admin/masterlist" },

@@ -19,15 +19,10 @@ const AdminSidebar = () => {
 
   const menuItems = [
     { label: "Dashboard", icon: <FaTachometerAlt />, path: "/admin", exact: true },
-    {
-      label: "Registrants",
-      icon: <FaUser />,
-      path: "/admin/senior-citizen",
-      exact: true,
-      subMenu: [
-        { label: "Validation", icon: <FaUserPlus />, path: "/admin/admin-registrants" },
-      ],
-    },
+    
+    { label: "Add Applicant", icon: <FaUserPlus />, path: "/admin/admin-registrants" },
+      
+    
     { label: "Masterlist", icon: <FaFileAlt />, path: "/admin/admin-masterlist" },
     { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { rtdb } from "../../router/Firebase"; // ✅ Firebase RTDB
-import { ref, onValue, off } from "firebase/database";
+import { rtdb } from "../../router/Firebase";
+import { ref, onValue, update, get } from "firebase/database";
 
 const barangays = [
   "Binanuun",
@@ -20,16 +20,7 @@ const barangays = [
   "Sto. Niño",
 ];
 
-// ✅ Normalize names
-const normalizeName = (first, middle, surname, extName = "") => {
-  return `${(first || "").trim()} ${(middle || "").trim()} ${(surname || "").trim()} ${(extName || "").trim()}`
-    .toLowerCase()
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
-// ✅ Format date (handles Jul-28-1953 style)
+// Format date safely
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
   try {
@@ -41,57 +32,21 @@ const formatDate = (dateStr) => {
         day: "2-digit",
       });
     }
-
-    // fallback manual parsing for "MMM-DD-YYYY"
-    const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      const [month, day, year] = parts;
-      return `${month} ${day}, ${year}`;
-    }
-
     return dateStr;
   } catch {
     return dateStr;
   }
 };
 
-// ✅ Merge function
-const mergeData = (masterData, eligibleData, rfidData) => {
-  const eligibleMap = eligibleData.map((e) => ({
-    ...e,
-    normName: normalizeName(e.firstName, e.middleName, e.surname, e.extName),
-  }));
-
-  const mergedOverall = masterData.map((person) => {
-    const normMaster = normalizeName(
-      person.firstName,
-      person.middleName,
-      person.surname,
-      person.extName
-    );
-
-    const isEligible = eligibleMap.some((e) => e.normName === normMaster);
-    const rfidMatch = rfidData.find((r) => r.normName === normMaster);
-
-    return {
-      ...person,
-      status: isEligible ? "Eligible" : (person.status || "Active"),
-      rfidStatus: rfidMatch?.status || "Not Bound",
-      rfidCode: rfidMatch?.rfidCode || "-",
-      pensionReceived: rfidMatch?.pensionReceived ? "Yes" : "No",
-      missed: rfidMatch?.missedConsecutive ?? 0,
-      lastClaim: rfidMatch?.lastClaimDate
-        ? formatDate(rfidMatch.lastClaimDate)
-        : "Never",
-      birthday: person.birthDate ? formatDate(person.birthDate) : "-", // ✅ Corrected field
-    };
-  });
-
-  const pensionersOnly = mergedOverall.filter(
-    (row) => row.status === "Eligible"
-  );
-
-  return { overall: mergedOverall, pensioners: pensionersOnly };
+// Compute age
+const getAge = (dateStr) => {
+  if (!dateStr || dateStr === "Never") return "N/A";
+  const today = new Date();
+  const birthDate = new Date(dateStr);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
 };
 
 const Masterlist = () => {
@@ -103,92 +58,103 @@ const Masterlist = () => {
   const [search, setSearch] = useState("");
   const [barangayFilter, setBarangayFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => {
-    const masterRef = ref(rtdb, "masterlist");
-    const eligibleRef = ref(rtdb, "eligible");
-    const rfidBindingsRef = ref(rtdb, "rfidBindings");
+    const seniorsRef = ref(rtdb, "senior_citizens");
+    const rfidRef = ref(rtdb, "rfidBindings");
 
-    let masterData = [];
-    let eligibleData = [];
-    let rfidData = [];
+    let seniorsSnap = null;
+    let rfidSnap = null;
 
-    const update = () => {
-      const merged = mergeData(masterData, eligibleData, rfidData);
-      setRecords(merged);
-      setFilteredRecords(merged.overall);
+    const mergeData = (seniorsSnap, rfidSnap) => {
+      if (!seniorsSnap.exists()) {
+        setRecords({ overall: [], pensioners: [] });
+        setFilteredRecords([]);
+        setLoading(false);
+        return;
+      }
+
+      const seniorsData = seniorsSnap.val();
+      const rfidData = rfidSnap.exists() ? rfidSnap.val() : {};
+
+      const seniorsArray = Object.entries(seniorsData).map(([id, value]) => {
+        const rfidInfo =
+          Object.values(rfidData).find((r) => r.seniorId === value.seniorId) ||
+          {};
+
+        return {
+          id,
+          seniorId: value.seniorId || "",
+          surname: value.lastName || "",
+          firstName: value.firstName || "",
+          middleName: value.middleName || "",
+          extName: value.extName || "",
+          barangay: value.barangay || "-",
+          birthday: value.dateOfBirth || "",
+          birthdayFormatted: formatDate(value.dateOfBirth),
+          status: value.status || "Active",
+          rfidStatus: rfidInfo.status || "Not Bound",
+          rfidCode: rfidInfo.rfidCode || "-",
+          pensionReceived: rfidInfo.pensionReceived ? "Yes" : "No",
+          missed: rfidInfo.missedConsecutive ?? 0,
+          lastClaim: rfidInfo.lastClaimDate
+            ? formatDate(rfidInfo.lastClaimDate)
+            : "Never",
+        };
+      });
+
+      const overall = seniorsArray;
+      const pensioners = seniorsArray.filter(
+        (row) => row.status === "Eligible"
+      );
+
+      setRecords({ overall, pensioners });
+      setFilteredRecords(overall);
       setLoading(false);
     };
 
-    const handleMaster = onValue(masterRef, (snapshot) => {
-      masterData = snapshot.exists()
-        ? Object.entries(snapshot.val()).map(([id, data]) => ({ id, ...data }))
-        : [];
-      update();
+    const unsubSeniors = onValue(seniorsRef, (snap) => {
+      seniorsSnap = snap;
+      if (seniorsSnap && rfidSnap) mergeData(seniorsSnap, rfidSnap);
     });
 
-    const handleEligible = onValue(eligibleRef, (snapshot) => {
-      eligibleData = snapshot.exists()
-        ? Object.entries(snapshot.val()).map(([id, data]) => ({ id, ...data }))
-        : [];
-      update();
-    });
-
-    const handleRfid = onValue(rfidBindingsRef, (snapshot) => {
-      rfidData = snapshot.exists()
-        ? Object.entries(snapshot.val()).map(([id, data]) => ({
-            id,
-            ...data,
-            normName: normalizeName(
-              data.firstName,
-              data.middleName,
-              data.surname,
-              data.extName
-            ),
-          }))
-        : [];
-      update();
+    const unsubRfid = onValue(rfidRef, (snap) => {
+      rfidSnap = snap;
+      if (seniorsSnap && rfidSnap) mergeData(seniorsSnap, rfidSnap);
     });
 
     return () => {
-      off(masterRef, "value", handleMaster);
-      off(eligibleRef, "value", handleEligible);
-      off(rfidBindingsRef, "value", handleRfid);
+      unsubSeniors();
+      unsubRfid();
     };
   }, []);
 
+  // Filters
   useEffect(() => {
     if (loading) return;
-
     let sourceData =
-      activeTab === "overall" ? records.overall || [] : records.pensioners || [];
-
+      activeTab === "overall" ? records.overall : records.pensioners;
     let filtered = [...sourceData];
 
-    if (search.trim() !== "") {
-      filtered = filtered.filter((row) => {
-        const fullName = normalizeName(
-          row.firstName,
-          row.middleName,
-          row.surname,
-          row.extName
-        );
-        return fullName.includes(search.toLowerCase());
-      });
-    }
+    if (search.trim() !== "")
+      filtered = filtered.filter((row) =>
+        `${row.surname}, ${row.firstName} ${row.middleName} ${row.extName}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      );
 
-    if (barangayFilter !== "All") {
+    if (barangayFilter !== "All")
       filtered = filtered.filter(
         (row) => row.barangay?.toLowerCase() === barangayFilter.toLowerCase()
       );
-    }
 
-    if (statusFilter !== "All" && activeTab === "overall") {
+    if (statusFilter !== "All" && activeTab === "overall")
       filtered = filtered.filter(
         (row) =>
-          (row.status || "Active").toLowerCase() === statusFilter.toLowerCase()
+          (row.status || "Active").toLowerCase() ===
+          statusFilter.toLowerCase()
       );
-    }
 
     setFilteredRecords(filtered);
   }, [search, barangayFilter, statusFilter, activeTab, records, loading]);
@@ -200,10 +166,47 @@ const Masterlist = () => {
     setActiveTab("overall");
   };
 
+  // ✅ Eligibility check against pensionAgencies
+  const handleValidation = async (status) => {
+    if (!selectedRecord) return;
+    try {
+      // Check existing pensions
+      const agencies = ["AFP", "GSIS", "PVAO", "SSS"];
+      let hasExistingPension = false;
+
+      for (const agency of agencies) {
+        const agencyRef = ref(
+          rtdb,
+          `pensionAgencies/${agency}/${selectedRecord.seniorId}`
+        );
+        const snapshot = await get(agencyRef);
+        if (snapshot.exists()) {
+          hasExistingPension = true;
+          break;
+        }
+      }
+
+      if (status === "Eligible" && hasExistingPension) {
+        alert(
+          "❌ This senior already has an existing pension from another agency. Cannot mark as Eligible."
+        );
+        return;
+      }
+
+      const recordRef = ref(rtdb, `senior_citizens/${selectedRecord.id}`);
+      await update(recordRef, { status });
+      alert(`✅ Record updated to ${status}`);
+      setSelectedRecord(null);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update record.");
+    }
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">Masterlist</h1>
-      <p className="text-gray-600">Official Validated Senior Citizens</p>
+      <p className="text-gray-600">Senior Citizens Records</p>
 
       {/* Filters */}
       <div className="mt-4 flex flex-wrap gap-2 items-center">
@@ -252,7 +255,7 @@ const Masterlist = () => {
           onClick={() => setActiveTab("overall")}
           className={`px-6 py-2 rounded-t-lg font-semibold ${
             activeTab === "overall"
-              ? "bg-blue-900 text-white"
+              ? "bg-orange-500 text-white"
               : "bg-gray-200 text-gray-700"
           }`}
         >
@@ -262,7 +265,7 @@ const Masterlist = () => {
           onClick={() => setActiveTab("pensioners")}
           className={`px-6 py-2 rounded-t-lg font-semibold ${
             activeTab === "pensioners"
-              ? "bg-blue-900 text-white"
+              ? "bg-orange-500 text-white"
               : "bg-gray-200 text-gray-700"
           }`}
         >
@@ -293,13 +296,17 @@ const Masterlist = () => {
             </thead>
             <tbody>
               {filteredRecords.map((row, idx) => (
-                <tr key={row.id || idx} className="border-t">
+                <tr
+                  key={row.id || idx}
+                  className="border-t hover:bg-gray-50 cursor-pointer"
+                  onClick={() => setSelectedRecord(row)}
+                >
                   <td className="px-4 py-2">
                     {row.surname}, {row.firstName} {row.middleName || ""}{" "}
                     {row.extName || ""}
                   </td>
-                  <td className="px-4 py-2">{row.birthday}</td>
-                  <td className="px-4 py-2">{row.barangay || "-"}</td>
+                  <td className="px-4 py-2">{row.birthdayFormatted}</td>
+                  <td className="px-4 py-2">{row.barangay}</td>
                   <td
                     className={`px-4 py-2 font-medium ${
                       row.status === "Eligible"
@@ -322,9 +329,7 @@ const Masterlist = () => {
                   >
                     {row.rfidStatus}
                   </td>
-                  <td className="px-4 py-2 font-mono">
-                    {row.rfidCode || "-"}
-                  </td>
+                  <td className="px-4 py-2 font-mono">{row.rfidCode}</td>
                   <td>{row.pensionReceived}</td>
                   <td>{row.missed}</td>
                   <td>{row.lastClaim}</td>
@@ -334,6 +339,76 @@ const Masterlist = () => {
           </table>
         )}
       </div>
+
+      {/* Modal */}
+      {selectedRecord && (
+        <div className="fixed inset-0 flex items-center justify-center z-10 bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+            <h2 className="text-lg font-bold mb-4">Validate Senior</h2>
+            <p>
+              <strong>Name:</strong> {selectedRecord.surname},{" "}
+              {selectedRecord.firstName} {selectedRecord.middleName}{" "}
+              {selectedRecord.extName}
+            </p>
+            <p>
+              <strong>Barangay:</strong> {selectedRecord.barangay}
+            </p>
+            <p>
+              <strong>Birthday:</strong> {formatDate(selectedRecord.birthday)}
+            </p>
+            <p>
+              <strong>Age:</strong> {getAge(selectedRecord.birthday)}
+            </p>
+            <p>
+              <strong>Status:</strong> {selectedRecord.status}
+            </p>
+            <p>
+              <strong>RFID Status:</strong> {selectedRecord.rfidStatus}
+            </p>
+            <p>
+              <strong>RFID Code:</strong> {selectedRecord.rfidCode}
+            </p>
+            <p>
+              <strong>Pension Received:</strong> {selectedRecord.pensionReceived}
+            </p>
+            <p>
+              <strong>Missed Consecutive:</strong> {selectedRecord.missed}
+            </p>
+            <p className="mb-4">
+              <strong>Last Claim Date:</strong> {selectedRecord.lastClaim}
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleValidation("Eligible")}
+                className="bg-green-500 text-white px-3 py-2 rounded"
+              >
+                Mark Eligible
+              </button>
+              <button
+                onClick={() => handleValidation("Active")}
+                className="bg-blue-500 text-white px-3 py-2 rounded"
+              >
+                Mark Active
+              </button>
+              {/* <button
+                onClick={() => handleValidation("Removed")}
+                className="bg-red-500 text-white px-3 py-2 rounded"
+              >
+                Reject
+              </button> */}
+
+              <button
+                onClick={() => setSelectedRecord(null)}
+                className="ml-auto bg-gray-300 px-3 py-2 rounded"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

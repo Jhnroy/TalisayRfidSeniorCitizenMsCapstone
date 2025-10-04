@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { rtdb } from "../../router/Firebase"; // ✅ Firebase RTDB
-import { ref, onValue, off } from "firebase/database";
+import { rtdb } from "../../router/Firebase";
+import { ref, onValue } from "firebase/database";
 
 const barangays = [
   "Binanuun",
@@ -20,16 +20,7 @@ const barangays = [
   "Sto. Niño",
 ];
 
-// ✅ Normalize names
-const normalizeName = (first, middle, surname, extName = "") => {
-  return `${(first || "").trim()} ${(middle || "").trim()} ${(surname || "").trim()} ${(extName || "").trim()}`
-    .toLowerCase()
-    .replace(/[.,]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
-// ✅ Format date (handles Jul-28-1953 style)
+// Safe date formatter
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
   try {
@@ -41,57 +32,10 @@ const formatDate = (dateStr) => {
         day: "2-digit",
       });
     }
-
-    // fallback manual parsing for "MMM-DD-YYYY"
-    const parts = dateStr.split("-");
-    if (parts.length === 3) {
-      const [month, day, year] = parts;
-      return `${month} ${day}, ${year}`;
-    }
-
     return dateStr;
   } catch {
     return dateStr;
   }
-};
-
-// ✅ Merge function
-const mergeData = (masterData, eligibleData, rfidData) => {
-  const eligibleMap = eligibleData.map((e) => ({
-    ...e,
-    normName: normalizeName(e.firstName, e.middleName, e.surname, e.extName),
-  }));
-
-  const mergedOverall = masterData.map((person) => {
-    const normMaster = normalizeName(
-      person.firstName,
-      person.middleName,
-      person.surname,
-      person.extName
-    );
-
-    const isEligible = eligibleMap.some((e) => e.normName === normMaster);
-    const rfidMatch = rfidData.find((r) => r.normName === normMaster);
-
-    return {
-      ...person,
-      status: isEligible ? "Eligible" : (person.status || "Active"),
-      rfidStatus: rfidMatch?.status || "Not Bound",
-      rfidCode: rfidMatch?.rfidCode || "-",
-      pensionReceived: rfidMatch?.pensionReceived ? "Yes" : "No",
-      missed: rfidMatch?.missedConsecutive ?? 0,
-      lastClaim: rfidMatch?.lastClaimDate
-        ? formatDate(rfidMatch.lastClaimDate)
-        : "Never",
-      birthday: person.birthDate ? formatDate(person.birthDate) : "-", // ✅ Corrected field
-    };
-  });
-
-  const pensionersOnly = mergedOverall.filter(
-    (row) => row.status === "Eligible"
-  );
-
-  return { overall: mergedOverall, pensioners: pensionersOnly };
 };
 
 const Masterlist = () => {
@@ -105,76 +49,95 @@ const Masterlist = () => {
   const [statusFilter, setStatusFilter] = useState("All");
 
   useEffect(() => {
-    const masterRef = ref(rtdb, "masterlist");
-    const eligibleRef = ref(rtdb, "eligible");
-    const rfidBindingsRef = ref(rtdb, "rfidBindings");
+    const seniorsRef = ref(rtdb, "senior_citizens");
+    const rfidRef = ref(rtdb, "rfidBindings");
 
-    let masterData = [];
-    let eligibleData = [];
-    let rfidData = [];
+    let seniorsSnapData = null;
+    let rfidSnapData = null;
 
-    const update = () => {
-      const merged = mergeData(masterData, eligibleData, rfidData);
-      setRecords(merged);
-      setFilteredRecords(merged.overall);
+    const handleData = (seniorsSnap, rfidSnap) => {
+      if (!seniorsSnap.exists()) {
+        setRecords({ overall: [], pensioners: [] });
+        setFilteredRecords([]);
+        setLoading(false);
+        return;
+      }
+
+      const seniorsData = seniorsSnap.val();
+      const rfidData = rfidSnap.exists() ? rfidSnap.val() : {};
+
+      const seniorsArray = Object.entries(seniorsData).map(([id, value]) => {
+        // Merge using seniorId from rfidBindings
+        const rfidInfo =
+          Object.values(rfidData).find((r) => r.seniorId === value.seniorId) ||
+          {};
+
+        return {
+          id,
+          surname: value.lastName || "",
+          firstName: value.firstName || "",
+          middleName: value.middleName || "",
+          extName: value.extName || "",
+          barangay: value.barangay || "-",
+          birthday: formatDate(value.dateOfBirth),
+          status: value.status || "Active",
+
+          // RFID details
+          rfidStatus: rfidInfo.status || "Not Bound",
+          rfidCode: rfidInfo.rfidCode || "-",
+          pensionReceived: rfidInfo.pensionReceived ? "Yes" : "No",
+          missed: rfidInfo.missedConsecutive ?? 0,
+          lastClaim: rfidInfo.lastClaimDate
+            ? formatDate(rfidInfo.lastClaimDate)
+            : "Never",
+        };
+      });
+
+      const overall = seniorsArray;
+      const pensioners = seniorsArray.filter(
+        (row) => row.status === "Eligible"
+      );
+
+      setRecords({ overall, pensioners });
+      setFilteredRecords(overall);
       setLoading(false);
     };
 
-    const handleMaster = onValue(masterRef, (snapshot) => {
-      masterData = snapshot.exists()
-        ? Object.entries(snapshot.val()).map(([id, data]) => ({ id, ...data }))
-        : [];
-      update();
+    const unsubSeniors = onValue(seniorsRef, (snap) => {
+      seniorsSnapData = snap;
+      if (seniorsSnapData && rfidSnapData) {
+        handleData(seniorsSnapData, rfidSnapData);
+      }
     });
 
-    const handleEligible = onValue(eligibleRef, (snapshot) => {
-      eligibleData = snapshot.exists()
-        ? Object.entries(snapshot.val()).map(([id, data]) => ({ id, ...data }))
-        : [];
-      update();
-    });
-
-    const handleRfid = onValue(rfidBindingsRef, (snapshot) => {
-      rfidData = snapshot.exists()
-        ? Object.entries(snapshot.val()).map(([id, data]) => ({
-            id,
-            ...data,
-            normName: normalizeName(
-              data.firstName,
-              data.middleName,
-              data.surname,
-              data.extName
-            ),
-          }))
-        : [];
-      update();
+    const unsubRfid = onValue(rfidRef, (snap) => {
+      rfidSnapData = snap;
+      if (seniorsSnapData && rfidSnapData) {
+        handleData(seniorsSnapData, rfidSnapData);
+      }
     });
 
     return () => {
-      off(masterRef, "value", handleMaster);
-      off(eligibleRef, "value", handleEligible);
-      off(rfidBindingsRef, "value", handleRfid);
+      unsubSeniors();
+      unsubRfid();
     };
   }, []);
 
+  // Filtering
   useEffect(() => {
     if (loading) return;
 
     let sourceData =
-      activeTab === "overall" ? records.overall || [] : records.pensioners || [];
+      activeTab === "overall" ? records.overall : records.pensioners;
 
     let filtered = [...sourceData];
 
     if (search.trim() !== "") {
-      filtered = filtered.filter((row) => {
-        const fullName = normalizeName(
-          row.firstName,
-          row.middleName,
-          row.surname,
-          row.extName
-        );
-        return fullName.includes(search.toLowerCase());
-      });
+      filtered = filtered.filter((row) =>
+        `${row.surname}, ${row.firstName} ${row.middleName} ${row.extName}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      );
     }
 
     if (barangayFilter !== "All") {
@@ -203,7 +166,7 @@ const Masterlist = () => {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">Masterlist</h1>
-      <p className="text-gray-600">Official Validated Senior Citizens</p>
+      <p className="text-gray-600">Senior Citizens Records</p>
 
       {/* Filters */}
       <div className="mt-4 flex flex-wrap gap-2 items-center">
@@ -299,7 +262,7 @@ const Masterlist = () => {
                     {row.extName || ""}
                   </td>
                   <td className="px-4 py-2">{row.birthday}</td>
-                  <td className="px-4 py-2">{row.barangay || "-"}</td>
+                  <td className="px-4 py-2">{row.barangay}</td>
                   <td
                     className={`px-4 py-2 font-medium ${
                       row.status === "Eligible"
@@ -322,9 +285,7 @@ const Masterlist = () => {
                   >
                     {row.rfidStatus}
                   </td>
-                  <td className="px-4 py-2 font-mono">
-                    {row.rfidCode || "-"}
-                  </td>
+                  <td className="px-4 py-2 font-mono">{row.rfidCode}</td>
                   <td>{row.pensionReceived}</td>
                   <td>{row.missed}</td>
                   <td>{row.lastClaim}</td>

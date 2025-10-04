@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaSearch, FaLink } from "react-icons/fa";
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
-import { rtdb } from "../../router/Firebase"; // ✅ RTDB lang gagamitin
+import { rtdb } from "../../router/Firebase"; //  RTDB lang gagamitin
 import { ref, onValue, set, update, get } from "firebase/database";
 
 const RfidBinding = () => {
@@ -18,7 +18,7 @@ const RfidBinding = () => {
 
   const [deviceOnline, setDeviceOnline] = useState(false);
 
-  // ✅ Listen to device scanner (RTDB)
+  //  Listen to device scanner (RTDB)
   useEffect(() => {
     const scannerRef = ref(rtdb, "device/scanner");
     const unsub = onValue(scannerRef, (snapshot) => {
@@ -34,16 +34,20 @@ const RfidBinding = () => {
     return () => unsub();
   }, []);
 
-  // ✅ Fetch eligible members (RTDB)
+  //  Fetch eligible members (direct from senior_citizens)
   useEffect(() => {
-    const membersRef = ref(rtdb, "eligible");
-    const unsub = onValue(membersRef, (snapshot) => {
+    const seniorsRef = ref(rtdb, "senior_citizens");
+    const unsub = onValue(seniorsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        const arr = Object.keys(data).map((key) => ({
-          id: key,
-          ...data[key],
-        }));
+        const arr = Object.keys(data)
+          .map((key) => ({
+            id: key,
+            ...data[key],
+          }))
+          //  Only seniors with status "Eligible"
+          .filter((m) => m.status === "Eligible");
+
         setMembers(arr);
       } else {
         setMembers([]);
@@ -53,7 +57,7 @@ const RfidBinding = () => {
     return () => unsub();
   }, []);
 
-  // ✅ Fetch bindings (RTDB)
+  //  Fetch bindings (RTDB)
   useEffect(() => {
     const bindingsRef = ref(rtdb, "rfidBindings");
     const unsub = onValue(bindingsRef, (snapshot) => {
@@ -72,7 +76,7 @@ const RfidBinding = () => {
     return () => unsub();
   }, []);
 
-  // ✅ Cleanup orphaned member.rfidCode kapag wala na sa bindings
+  // Cleanup orphaned member.rfidCode kapag wala na sa bindings
   useEffect(() => {
     members.forEach((m) => {
       if (m.rfidCode && !bindings.some((b) => b.rfidCode === m.rfidCode)) {
@@ -87,7 +91,7 @@ const RfidBinding = () => {
     setRfidCode("");
   };
 
-  // ✅ Start Scan (RTDB)
+  //  Start Scan (RTDB)
   const handleStartScan = async () => {
     if (!deviceOnline) {
       setIsModalOpen(true);
@@ -109,7 +113,7 @@ const RfidBinding = () => {
     }
   };
 
-  // ✅ Bind RFID (with error handling)
+  //  Bind RFID (without lastClaimDate)
   const handleBindRfid = async () => {
     if (!selectedMember || !rfidCode) return;
 
@@ -134,14 +138,16 @@ const RfidBinding = () => {
         return;
       }
 
+      const now = new Date().toISOString();
+
       const newBinding = {
         ...selectedMember,
         rfidCode,
-        date: new Date().toISOString(),
+        date: now,
         status: "Bound",
         pensionReceived: false,
         missedConsecutive: 0,
-        lastClaimDate: null,
+        lastClaimDate: null, //  walang value muna
       };
 
       // Save binding by RFID code
@@ -150,12 +156,13 @@ const RfidBinding = () => {
       // Update member
       await update(ref(rtdb, `eligible/${selectedMember.id}`), {
         rfidCode,
+        lastClaimDate: null, //  wala munang laman
       });
 
       // Clear scanner lastUID
       await update(ref(rtdb, "device/scanner"), { lastUID: "" });
 
-      setBindMessage("✅ RFID successfully bound!");
+      setBindMessage(" RFID successfully bound!");
       setSelectedMember(null);
       setRfidCode("");
     } catch (err) {
@@ -410,7 +417,7 @@ const RfidBinding = () => {
         </table>
       </div>
 
-      {/* ⚠️ Modal Warning */}
+      {/*  Modal Warning */}
       {isModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
           <div className="bg-white p-6 rounded-xl shadow-xl max-w-sm w-full text-center border border-gray-200">
