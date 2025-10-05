@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ref, push } from "firebase/database";
-import { rtdb } from "./adminJS/AdminRegistrant.js" // ✅ Firebase RTDB
+import { rtdb } from "./adminJS/AdminRegistrant.js" //  Firebase RTDB
 const AdminRegistrant = () => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -90,16 +90,15 @@ const AdminRegistrant = () => {
   if (age < 60) {
     alert("Only senior citizens aged 60 and above can be registered.");
     setLoading(false);
-    return; // ❌ stop execution
+    return;
   }
 
   if (!/^\d{6}$/.test(formData.seniorId)) {
-  alert("Senior Citizen ID must be exactly 6 digits.");
-  setLoading(false);
-  return;
-}
+    alert("Senior Citizen ID must be exactly 6 digits.");
+    setLoading(false);
+    return;
+  }
 
-  // ✅ Contact number validation
   const contactRegex = /^(09\d{9}|\+639\d{9})$/;
   if (!contactRegex.test(formData.contactNumber)) {
     alert("Please enter a valid Philippine contact number (09XXXXXXXXX or +639XXXXXXXXX).");
@@ -108,13 +107,18 @@ const AdminRegistrant = () => {
   }
 
   try {
+    const now = new Date().toISOString();
+
     await push(ref(rtdb, "senior_citizens"), {
       ...formData,
-      age: age, // ✅ save computed age to Firebase
+      age: age,
+      createdAt: now,   // ✅ Save timestamp
+      updatedAt: now,   // ✅ Save timestamp
     });
+
     alert("Senior Citizen registration saved successfully!");
 
-    // Reset form
+    // Reset form state (no need to include timestamps here)
     setFormData({
       firstName: "",
       middleName: "",
@@ -148,6 +152,7 @@ const AdminRegistrant = () => {
 
   setLoading(false);
 };
+
 
 
   const handleCancel = () => {

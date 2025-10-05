@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Calendar as BigCalendar, momentLocalizer } from "react-big-calendar";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import moment from "moment";
+import { rtdb } from "../../router/Firebase";
+import { ref, onValue } from "firebase/database";
 
 const localizer = momentLocalizer(moment);
 
@@ -11,83 +13,53 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState("month");
 
-  // Load events from localStorage
+  // ✅ Load events from Firebase schedules (view only)
   useEffect(() => {
-    const stored = localStorage.getItem("calendar-events");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      const fixed = parsed.map((e) => ({
-        ...e,
-        start: new Date(e.start),
-        end: new Date(e.end),
-      }));
-      setEvents(fixed);
-    }
+    const eventsRef = ref(rtdb, "schedules");
+    const unsubscribe = onValue(eventsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const loadedEvents = Object.keys(data).map((key) => ({
+          id: key,
+          title: data[key].title,
+          start: new Date(data[key].start),
+          end: new Date(data[key].end),
+          color: data[key].color || "#4285F4",
+        }));
+        setEvents(loadedEvents);
+      } else {
+        setEvents([]);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Save events to localStorage (in case of deletion)
-  useEffect(() => {
-    localStorage.setItem("calendar-events", JSON.stringify(events));
-  }, [events]);
-
+  // ✅ Show details on click
   const handleSelectEvent = (event) => {
     alert(
-      `📅 ${event.title}\n🕒 From: ${event.start.toLocaleString()}\nTo: ${event.end.toLocaleString()}`
+      `📌 ${event.title}\n🗓 Start: ${event.start.toLocaleString()}\n🕒 End: ${event.end.toLocaleString()}`
     );
   };
 
-  const handleEventDelete = (event) => {
-    const confirmDelete = window.confirm(`Delete event: "${event.title}"?`);
-    if (confirmDelete) {
-      const updated = events.filter((e) => e !== event);
-      setEvents(updated);
-    }
-  };
-
-  // Navigation controls
-  const handleNavigate = (action) => {
-    const newDate = (() => {
-      switch (action) {
-        case "TODAY":
-          return new Date();
-        case "PREV":
-          return moment(currentDate).subtract(1, currentView).toDate();
-        case "NEXT":
-          return moment(currentDate).add(1, currentView).toDate();
-        default:
-          return currentDate;
-      }
-    })();
-    setCurrentDate(newDate);
+  // ✅ Colorized events
+  const eventStyleGetter = (event) => {
+    return {
+      style: {
+        backgroundColor: event.color || "#4285F4",
+        borderRadius: "6px",
+        color: "white",
+        border: "0px",
+        display: "block",
+        paddingLeft: "4px",
+      },
+    };
   };
 
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-4">Calendar</h2>
 
-      {/* Navigation Buttons */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => handleNavigate("TODAY")}
-          className="bg-gray-800 text-white px-4 py-1 rounded hover:bg-gray-700"
-        >
-          Today
-        </button>
-        <button
-          onClick={() => handleNavigate("PREV")}
-          className="bg-gray-800 text-white px-4 py-1 rounded hover:bg-gray-700"
-        >
-          ← Back
-        </button>
-        <button
-          onClick={() => handleNavigate("NEXT")}
-          className="bg-gray-800 text-white px-4 py-1 rounded hover:bg-gray-700"
-        >
-          Next →
-        </button>
-      </div>
-
-      {/* Calendar Display */}
       <div style={{ height: "75vh" }} className="border rounded shadow">
         <BigCalendar
           localizer={localizer}
@@ -95,8 +67,10 @@ export default function Calendar() {
           startAccessor="start"
           endAccessor="end"
           style={{ height: "100%" }}
-          onSelectEvent={handleSelectEvent}
-          onDoubleClickEvent={handleEventDelete}
+          eventPropGetter={eventStyleGetter}
+          selectable={false} // ❌ disable slot selection
+          resizable={false} // ❌ disable resize
+          onSelectEvent={handleSelectEvent} // ✅ show info only
           date={currentDate}
           onNavigate={(date) => setCurrentDate(date)}
           onView={(view) => setCurrentView(view)}

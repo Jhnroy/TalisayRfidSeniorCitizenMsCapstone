@@ -31,6 +31,7 @@ import SuperAdminRegistrants from "../pages/superAdmin/SuperAdminRegistrants";
 import Validation from "../pages/superAdmin/Validation";
 import RfidBinding from "../pages/superAdmin/RfidBinding";
 import Masterlist from "../pages/superAdmin/Masterlist";
+import SuperAdminCalendar from "../pages/superAdmin/SuperAdminCalendar";
 
 // DSWD
 
@@ -97,7 +98,7 @@ const routes = createBrowserRouter([
       { index: true, element: <SuperAdminDashboard /> },
       { path: "registrants", element: <SuperAdminRegistrants /> },
       { path: "validation", element: <Validation /> },
-      { path: "calendar", element: <Calendar /> },
+      { path: "super-admin-calendar", element: <SuperAdminCalendar /> },
       { path: "rfid-binding", element: <RfidBinding /> },
       { path: "masterlist", element: <Masterlist /> },
     ],

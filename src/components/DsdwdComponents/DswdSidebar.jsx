@@ -18,7 +18,7 @@ const DswdSidebar = () => {
   const menus = [
     { name: "Masterlist", icon: LayoutDashboard, path: "/dswd-admin" },
     { name: "Validation", icon: CheckCircle, path: "/dswd-admin/dswd-validation" },
-    { name: "Pension", icon: Users, path: "/dswd-admin/dswd-pension" },
+    // { name: "Pension", icon: Users, path: "/dswd-admin/dswd-pension" },
   ];
 
   const handleLogout = async () => {

@@ -341,74 +341,8 @@ const Masterlist = () => {
       </div>
 
       {/* Modal */}
-      {selectedRecord && (
-        <div className="fixed inset-0 flex items-center justify-center z-10 bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
-            <h2 className="text-lg font-bold mb-4">Validate Senior</h2>
-            <p>
-              <strong>Name:</strong> {selectedRecord.surname},{" "}
-              {selectedRecord.firstName} {selectedRecord.middleName}{" "}
-              {selectedRecord.extName}
-            </p>
-            <p>
-              <strong>Barangay:</strong> {selectedRecord.barangay}
-            </p>
-            <p>
-              <strong>Birthday:</strong> {formatDate(selectedRecord.birthday)}
-            </p>
-            <p>
-              <strong>Age:</strong> {getAge(selectedRecord.birthday)}
-            </p>
-            <p>
-              <strong>Status:</strong> {selectedRecord.status}
-            </p>
-            <p>
-              <strong>RFID Status:</strong> {selectedRecord.rfidStatus}
-            </p>
-            <p>
-              <strong>RFID Code:</strong> {selectedRecord.rfidCode}
-            </p>
-            <p>
-              <strong>Pension Received:</strong> {selectedRecord.pensionReceived}
-            </p>
-            <p>
-              <strong>Missed Consecutive:</strong> {selectedRecord.missed}
-            </p>
-            <p className="mb-4">
-              <strong>Last Claim Date:</strong> {selectedRecord.lastClaim}
-            </p>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleValidation("Eligible")}
-                className="bg-green-500 text-white px-3 py-2 rounded"
-              >
-                Mark Eligible
-              </button>
-              <button
-                onClick={() => handleValidation("Active")}
-                className="bg-blue-500 text-white px-3 py-2 rounded"
-              >
-                Mark Active
-              </button>
-              {/* <button
-                onClick={() => handleValidation("Removed")}
-                className="bg-red-500 text-white px-3 py-2 rounded"
-              >
-                Reject
-              </button> */}
-
-              <button
-                onClick={() => setSelectedRecord(null)}
-                className="ml-auto bg-gray-300 px-3 py-2 rounded"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
+      
     </div>
   );
 };

@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import { rtdb } from "../../router/Firebase";
 import { ref, onValue } from "firebase/database";
-import {
-  FaUsers,
-  FaCheckCircle,
-  FaMoneyBillWave,
-  FaUser,
-} from "react-icons/fa";
+import { FaUsers, FaCheckCircle, FaUser } from "react-icons/fa";
 
 // Barangay list
 const barangays = [
@@ -27,11 +22,18 @@ const barangays = [
   "Sto. Niño",
 ];
 
-// Helper: calculate age
+// Safe date parser
+const parseDate = (dateString) => {
+  if (!dateString) return null;
+  const d = new Date(dateString);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+// Helper: calculate current age
 const calculateAge = (birthDate) => {
-  if (!birthDate) return null;
+  const dob = parseDate(birthDate);
+  if (!dob) return null;
   const today = new Date();
-  const dob = new Date(birthDate);
   let age = today.getFullYear() - dob.getFullYear();
   const m = today.getMonth() - dob.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
@@ -42,9 +44,10 @@ const calculateAge = (birthDate) => {
 
 // Helper: check if senior will turn targetAge on next birthday
 const isUpcoming = (birthDate, targetAge) => {
-  if (!birthDate) return false;
+  const dob = parseDate(birthDate);
+  if (!dob) return false;
+
   const today = new Date();
-  const dob = new Date(birthDate);
   let nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
 
   if (nextBirthday < today) {
@@ -62,75 +65,83 @@ const SuperAdminDashboard = () => {
     total: 0,
     eligible: 0,
     active: 0,
-    payout: 0,
   });
-  const [octogenarians, setOctogenarians] = useState([]);
-  const [nonagenarians, setNonagenarians] = useState([]);
-  const [centenarians, setCentenarians] = useState([]);
+
+  // current categories
+  const [currentOcto, setCurrentOcto] = useState([]);
+  const [currentNona, setCurrentNona] = useState([]);
+  const [currentCente, setCurrentCente] = useState([]);
+
+  // upcoming categories
+  const [upcomingOcto, setUpcomingOcto] = useState([]);
+  const [upcomingNona, setUpcomingNona] = useState([]);
+  const [upcomingCente, setUpcomingCente] = useState([]);
 
   // Fetch data from Realtime Database
   useEffect(() => {
-    const masterRef = ref(rtdb, "masterlist");
-    const eligibleRef = ref(rtdb, "eligible");
+    const seniorRef = ref(rtdb, "senior_citizens");
+    const eligibleRef = ref(rtdb, "rfidBindings");
 
-    const unsubMaster = onValue(masterRef, (snap) => {
-      const masterData = snap.exists()
+    const unsubSenior = onValue(seniorRef, (snap) => {
+      const seniorData = snap.exists()
         ? Object.keys(snap.val()).map((id) => ({ id, ...snap.val()[id] }))
         : [];
+
+      const total = seniorData.length;
+
+      const activeData = seniorData.filter((m) => m.status === "Eligible");
+
+      // enrich data
+      const processed = seniorData
+        .map((m) => {
+          const age = calculateAge(m.dateOfBirth);
+          return {
+            name: `${m.firstName || ""} ${m.middleName || ""} ${m.lastName || ""}`.trim(),
+            age,
+            birthday: m.dateOfBirth,
+            barangay: m.barangay,
+          };
+        })
+        .filter((p) => p.age !== null);
+
+      // Current seniors
+      setCurrentOcto(processed.filter((p) => p.age >= 80 && p.age < 90));
+      setCurrentNona(processed.filter((p) => p.age >= 90 && p.age < 100));
+      setCurrentCente(processed.filter((p) => p.age >= 100));
+
+      // Upcoming seniors
+      setUpcomingOcto(processed.filter((p) => isUpcoming(p.birthday, 80)));
+      setUpcomingNona(processed.filter((p) => isUpcoming(p.birthday, 90)));
+      setUpcomingCente(processed.filter((p) => isUpcoming(p.birthday, 100)));
 
       const unsubEligible = onValue(eligibleRef, (esnap) => {
         const eligibleData = esnap.exists()
           ? Object.keys(esnap.val()).map((id) => ({ id, ...esnap.val()[id] }))
           : [];
 
-        // Counts
-        const total = masterData.length;
-        const eligibleCount = eligibleData.length;
-        const activeCount = eligibleCount; // Active = Eligible
-        const monthlyPayout = eligibleCount * 1000;
-
+        // Stats
         setStats({
           total,
-          eligible: eligibleCount,
-          active: activeCount,
-          payout: `₱${monthlyPayout.toLocaleString()}`,
+          eligible: eligibleData.length,
+          active: activeData.length,
         });
 
         // Barangay counts (active only)
         const counts = {};
         barangays.forEach((b) => {
-          counts[b] = eligibleData.filter(
+          counts[b] = activeData.filter(
             (m) => m.barangay?.toLowerCase() === b.toLowerCase()
           ).length;
         });
         setBarangayCounts(counts);
 
-        // Upcoming beneficiaries (age-based from masterlist)
-        const upcoming = masterData
-          .map((m) => {
-            const age = calculateAge(m.birthDate);
-            return {
-              name: `${m.firstName} ${m.middleName || ""} ${m.surname}`,
-              age,
-              birthday: m.birthDate,
-              barangay: m.barangay,
-            };
-          })
-          .filter((p) => p.age !== null);
-
-        setOctogenarians(upcoming.filter((p) => isUpcoming(p.birthday, 80)));
-        setNonagenarians(upcoming.filter((p) => isUpcoming(p.birthday, 90)));
-        setCentenarians(upcoming.filter((p) => isUpcoming(p.birthday, 100)));
-
         setLoading(false);
       });
 
-      // Cleanup eligible listener
       return () => unsubEligible();
     });
 
-    // Cleanup master listener
-    return () => unsubMaster();
+    return () => unsubSenior();
   }, []);
 
   // Helper: Table Component
@@ -138,7 +149,7 @@ const SuperAdminDashboard = () => {
     <div className="bg-white shadow rounded-lg p-6">
       <h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3>
       {data.length === 0 ? (
-        <p className="text-gray-500">No upcoming beneficiaries.</p>
+        <p className="text-gray-500">No beneficiaries.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
@@ -187,7 +198,7 @@ const SuperAdminDashboard = () => {
       <h1 className="text-3xl font-bold text-gray-800">Dashboard Overview</h1>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white shadow rounded-xl flex items-center gap-4 p-5">
           <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-blue-100 text-blue-600">
             <FaUsers />
@@ -205,16 +216,6 @@ const SuperAdminDashboard = () => {
           <div>
             <p className="text-sm text-gray-500">Total Eligible for Pension</p>
             <p className="text-2xl font-bold text-gray-800">{stats.eligible}</p>
-          </div>
-        </div>
-
-        <div className="bg-white shadow rounded-xl flex items-center gap-4 p-5">
-          <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-orange-100 text-orange-600">
-            <FaMoneyBillWave />
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Monthly Payout Amount</p>
-            <p className="text-2xl font-bold text-gray-800">{stats.payout}</p>
           </div>
         </div>
 
@@ -250,25 +251,49 @@ const SuperAdminDashboard = () => {
         </div>
       </div>
 
+      {/* Current Beneficiaries */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-gray-700">Current Beneficiaries</h2>
+        <BeneficiaryTable
+          title="Current Octogenarians (₱10,000 Benefit)"
+          color="text-orange-600"
+          benefit="₱10,000"
+          data={currentOcto}
+        />
+        <BeneficiaryTable
+          title="Current Nonagenarians (₱10,000 Benefit)"
+          color="text-green-600"
+          benefit="₱10,000"
+          data={currentNona}
+        />
+        <BeneficiaryTable
+          title="Current Centenarians (₱100,000 Benefit)"
+          color="text-purple-600"
+          benefit="₱100,000"
+          data={currentCente}
+        />
+      </div>
+
       {/* Upcoming Beneficiaries */}
       <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-gray-700">Upcoming Beneficiaries</h2>
         <BeneficiaryTable
           title="Upcoming Octogenarians (₱10,000 Benefit)"
           color="text-orange-600"
           benefit="₱10,000"
-          data={octogenarians}
+          data={upcomingOcto}
         />
         <BeneficiaryTable
           title="Upcoming Nonagenarians (₱10,000 Benefit)"
           color="text-green-600"
           benefit="₱10,000"
-          data={nonagenarians}
+          data={upcomingNona}
         />
         <BeneficiaryTable
           title="Upcoming Centenarians (₱100,000 Benefit)"
           color="text-purple-600"
           benefit="₱100,000"
-          data={centenarians}
+          data={upcomingCente}
         />
       </div>
     </div>
