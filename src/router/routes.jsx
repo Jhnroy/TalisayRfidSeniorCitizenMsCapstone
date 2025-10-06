@@ -52,7 +52,7 @@ const routes = createBrowserRouter([
   // ------------------------------
   {
     path: "/",
-    element: <MainLayout />,
+    element: <Login />,
     errorElement: <NotFound />,
     children: [
       { index: true, element: <LandingPage /> },
