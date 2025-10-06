@@ -658,7 +658,7 @@ const AdminRegistrant = () => {
                   htmlFor="barangayCertificate"
                   className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  Upload Barangay Certificate{' '}
+                  Upload Valid I.D{' '}
                   <span className="text-red-500">*</span>
                 </label>
                 <p className="text-sm text-gray-500 mb-2">
