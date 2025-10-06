@@ -1,6 +1,37 @@
-import React, { useState } from 'react';
-import { ref, push } from "firebase/database";
+import React, { useState, useEffect } from "react";
+import { ref, push, onValue } from "firebase/database";
 import { rtdb } from "./adminJS/AdminRegistrant.js" //  Firebase RTDB
+
+
+
+///  Helper to log audit & notifications
+const logAudit = async (barangay, action, status, message, userId = "Unknown") => {
+  try {
+    const logRef = ref(rtdb, `auditLogs/${barangay}`);
+    await push(logRef, {
+      action,
+      status,
+      message,
+      performedBy: userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 🔔 Save notification (Success/Error only)
+    const notifRef = ref(rtdb, `notifications/${barangay}`);
+    await push(notifRef, {
+      message,
+      type: status === "SUCCESS" ? "success" : "error",
+      timestamp: new Date().toISOString(),
+      read: false,
+    });
+  } catch (error) {
+    console.error("Failed to save audit log/notification:", error);
+  }
+};
+
+
+
+
 const AdminRegistrant = () => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -27,6 +58,21 @@ const AdminRegistrant = () => {
 
   const [profilePreview, setProfilePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+
+  //  Listen to notifications
+  useEffect(() => {
+    if (!formData.barangay) return;
+    const notifRef = ref(rtdb, `notifications/${formData.barangay}`);
+    onValue(notifRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      const list = Object.keys(data).map((id) => ({
+        id,
+        ...data[id],
+      }));
+      setNotifications(list.reverse()); // newest first
+    });
+  }, [formData.barangay]);
 
   // Convert File → Base64
   const convertToBase64 = (file, callback) => {
@@ -52,6 +98,7 @@ const AdminRegistrant = () => {
     }
     return age;
   };
+
   // Handle field changes
   const handleChange = (e) => {
     const { name, value, type, checked, files } = e.target;
@@ -80,78 +127,106 @@ const AdminRegistrant = () => {
     }
   };
 
+
+  //  Number-only handler for contact numbers (max 11 digits)
+  const handleNumberInput = (e) => {
+    const value = e.target.value.replace(/\D/g, ""); // remove letters/symbols
+    if (value.length <= 11) {
+      setFormData((prev) => ({
+        ...prev,
+        [e.target.name]: value,
+      }));
+    }
+  };
+
     // Handle submit → Save to Firebase RTDB
+  
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-  const age = computeAge(formData.dateOfBirth);
+    const age = computeAge(formData.dateOfBirth);
 
-  if (age < 60) {
-    alert("Only senior citizens aged 60 and above can be registered.");
+    if (age < 60) {
+      alert("Only senior citizens aged 60 and above can be registered.");
+      await logAudit(formData.barangay, "REGISTER_SENIOR", "ERROR", "Age below 60");
+      setLoading(false);
+      return;
+    }
+
+    if (!/^\d{4}$/.test(formData.seniorId)) {
+      alert("Senior Citizen ID must be exactly 4 digits.");
+      await logAudit(formData.barangay, "REGISTER_SENIOR", "ERROR", "Invalid Senior ID format");
+      setLoading(false);
+      return;
+    }
+
+    const contactRegex = /^(09\d{9}|\+639\d{9})$/;
+    if (!contactRegex.test(formData.contactNumber)) {
+      alert("Please enter a valid Philippine contact number (09XXXXXXXXX or +639XXXXXXXXX).");
+      await logAudit(formData.barangay, "REGISTER_SENIOR", "ERROR", "Invalid contact number format");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+
+      await push(ref(rtdb, "senior_citizens"), {
+        ...formData,
+        age,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await logAudit(
+        formData.barangay,
+        "REGISTER_SENIOR",
+        "SUCCESS",
+        `Senior ${formData.lastName}, ${formData.firstName} registered successfully`,
+        "admin_001"
+      );
+
+      alert("Senior Citizen registration saved successfully!");
+
+      setFormData({
+        firstName: "",
+        middleName: "",
+        lastName: "",
+        dateOfBirth: "",
+        gender: "",
+        contactNumber: "",
+        seniorId: "",
+        disability: "",
+        houseNo: "",
+        streetName: "",
+        purok: "",
+        barangay: "",
+        municipality: "Talisay",
+        province: "Camarines Norte",
+        emergencyName: "",
+        emergencyContact: "",
+        emergencyRelationship: "",
+        birthCertificate: null,
+        barangayCertificate: null,
+        consent: false,
+        profilePicture: null,
+      });
+
+      setProfilePreview(null);
+      document.querySelectorAll('input[type="file"]').forEach((input) => {
+        input.value = "";
+      });
+    } catch (error) {
+      console.error("Error saving data:", error);
+      alert("Failed to save data.");
+      await logAudit(formData.barangay, "REGISTER_SENIOR", "ERROR", error.message || "Unknown error occurred");
+    }
+
     setLoading(false);
-    return;
-  }
+  };
 
-  if (!/^\d{6}$/.test(formData.seniorId)) {
-    alert("Senior Citizen ID must be exactly 6 digits.");
-    setLoading(false);
-    return;
-  }
 
-  const contactRegex = /^(09\d{9}|\+639\d{9})$/;
-  if (!contactRegex.test(formData.contactNumber)) {
-    alert("Please enter a valid Philippine contact number (09XXXXXXXXX or +639XXXXXXXXX).");
-    setLoading(false);
-    return;
-  }
-
-  try {
-    const now = new Date().toISOString();
-
-    await push(ref(rtdb, "senior_citizens"), {
-      ...formData,
-      age: age,
-      createdAt: now,   // ✅ Save timestamp
-      updatedAt: now,   // ✅ Save timestamp
-    });
-
-    alert("Senior Citizen registration saved successfully!");
-
-    // Reset form state (no need to include timestamps here)
-    setFormData({
-      firstName: "",
-      middleName: "",
-      lastName: "",
-      dateOfBirth: "",
-      gender: "",
-      contactNumber: "",
-      seniorId: "",
-      disability: "",
-      houseNo: "",
-      streetName: "",
-      barangay: "",
-      municipality: "Talisay",
-      province: "Camarines Norte",
-      emergencyName: "",
-      emergencyContact: "",
-      emergencyRelationship: "",
-      birthCertificate: null,
-      barangayCertificate: null,
-      consent: false,
-      profilePicture: null,
-    });
-    setProfilePreview(null);
-    document.querySelectorAll('input[type="file"]').forEach((input) => {
-      input.value = "";
-    });
-  } catch (error) {
-    console.error("Error saving data:", error);
-    alert("Failed to save data.");
-  }
-
-  setLoading(false);
-};
 
 
 
@@ -351,7 +426,7 @@ const AdminRegistrant = () => {
                 />
               </div>
 
-              {/* ✅ Computed Age Field */}
+              {/* Computed Age Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Age
@@ -390,22 +465,22 @@ const AdminRegistrant = () => {
             {/* Contact & ID */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label
-                  htmlFor="contactNumber"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="contactNumber" className="block text-sm font-medium text-gray-700 mb-1">
                   Contact Number <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="tel"
+                  type="text"
                   id="contactNumber"
                   name="contactNumber"
-                  placeholder="+63 XXX XXXX XXXX"
+                  placeholder="09XXXXXXXXX"
                   value={formData.contactNumber}
-                  onChange={handleChange}
+                  onInput={handleNumberInput} // ✅ digits only, max 11
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Must be 11 digits (e.g., 09123456789).
+                </p>
               </div>
 
               {/* Senior ID */}
@@ -417,37 +492,42 @@ const AdminRegistrant = () => {
                   Senior Citizen ID Number <span className="text-red-500">*</span>
                 </label>
                 <input
-                type="text"
-                id="seniorId"
-                name="seniorId"
-                placeholder="Enter 6-digit ID Number"
-                value={formData.seniorId}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                maxLength={6}   // ✅ Limit input to 6 digits
-                required
-              />
-
+                  type="text"
+                  id="seniorId"
+                  name="seniorId"
+                  placeholder="Enter 4-digit ID Number"
+                  value={formData.seniorId}
+                  onInput={(e) => {
+                    const value = e.target.value.replace(/\D/g, ""); // ✅ Numbers only
+                    if (value.length <= 4) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        seniorId: value,
+                      }));
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Must be exactly 4 digits.
+                </p>
               </div>
             </div>
 
             {/* Disability */}
             <div>
-              <label
-                htmlFor="disability"
-                className="block text-sm font-medium text-gray-700 mb-1">
-                Disability/Illness
-              </label>
-              <input
-                type="text"
-                id="disability"
-                name="disability"
-                placeholder="Specify"
-                value={formData.disability}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+                <label htmlFor="disability" className="block text-sm font-medium text-gray-700 mb-1">Disability/Illness</label>
+              <select id="disability" name="disability" value={formData.disability} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+              <option value="">Select</option>
+              <option value="With Disability">With Disability</option>
+              <option value="N/A">N/A</option>
+              <option value="Others">Others</option>
+              </select>
+              {formData.disability === "Others" && (
+              <input type="text" name="otherDisability" placeholder="Please specify" value={formData.otherDisability} onChange={handleChange} className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              )}
+              </div>
           </div>
 
           {/* Address & Additional Information */}
@@ -461,17 +541,57 @@ const AdminRegistrant = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Street Address <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  name="houseNo"
-                  placeholder="House No."
-                  value={formData.houseNo}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-                <input
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* House Number with Dropdown + Input */}
+                <div className="flex gap-2">
+                  {/* Dropdown */}
+                  <select
+                    name="houseNoOption"
+                    value={formData.houseNo === "N/A" ? "N/A" : "Number"}
+                    onChange={(e) => {
+                      if (e.target.value === "N/A") {
+                        setFormData((prev) => ({
+                          ...prev,
+                          houseNo: "N/A",
+                        }));
+                      } else {
+                        setFormData((prev) => ({
+                          ...prev,
+                          houseNo: "",
+                        }));
+                      }
+                    }}
+                    className="w-25 px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Number">Number</option>
+                    <option value="N/A">N/A</option>
+                  </select>
+
+                  {/* Input */}
+                  {formData.houseNo !== "N/A" && (
+                    <input
+                      type="text"
+                      name="houseNo"
+                      placeholder="House No. (max 3 digits)"
+                      value={formData.houseNo}
+                      onInput={(e) => {
+                        const value = e.target.value.replace(/\D/g, ""); // ✅ Numbers only
+                        if (value.length <= 3) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            houseNo: value,
+                          }));
+                        }
+                      }}
+                      className="w-full px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                      required
+                    />
+                  )}
+                </div>
+
+                {/* Street Name */}
+                {/* <input
                   type="text"
                   name="streetName"
                   placeholder="Street Name"
@@ -479,9 +599,28 @@ const AdminRegistrant = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   required
-                />
+                /> */}
+
+                {/* Purok Dropdown */}
+                <select
+                name="purok"
+                value={formData.purok} // ✅ tama na
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">Select Purok</option>
+                {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                  <option key={num} value={num}>
+                    Purok {num}
+                  </option>
+                ))}
+              </select>
+
               </div>
             </div>
+
+
 
             {/* Barangay & Municipality */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -592,16 +731,28 @@ const AdminRegistrant = () => {
                     Contact Number <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="tel"
+                    type="text"
                     id="emergencyContact"
                     name="emergencyContact"
-                    placeholder="+63 XXX XXXX XXXX"
+                    placeholder="09XXXXXXXXX"
                     value={formData.emergencyContact}
-                    onChange={handleChange}
+                    onChange={(e) => {
+                      // Allow only digits
+                      const value = e.target.value.replace(/\D/g, "");
+                      // Limit to 11 digits
+                      if (value.length <= 11) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          emergencyContact: value,
+                        }));
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    maxLength={11}
                     required
                   />
                 </div>
+
                 <div>
                   <label
                     htmlFor="emergencyRelationship"

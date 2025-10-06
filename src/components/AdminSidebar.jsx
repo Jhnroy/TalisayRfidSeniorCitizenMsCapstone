@@ -24,7 +24,7 @@ const AdminSidebar = () => {
       
     
     { label: "Masterlist", icon: <FaFileAlt />, path: "/admin/admin-masterlist" },
-    { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
+    // { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
     
     
@@ -45,7 +45,7 @@ const AdminSidebar = () => {
       {/* Backdrop when sidebar is open on mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 z-40"
+          className="fixed inset-0 bg-opacity-30 z-40"
           onClick={() => setIsOpen(false)}
         ></div>
       )}

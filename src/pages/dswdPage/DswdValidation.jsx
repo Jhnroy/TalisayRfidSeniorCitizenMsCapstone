@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { rtdb } from "../../router/Firebase";
-import { ref, onValue, update, get } from "firebase/database";
+import { ref, onValue, update, get, push, set } from "firebase/database";
 
 const barangays = [
   "All Barangays",
@@ -148,7 +148,7 @@ const DswdValidation = () => {
     setStatusFilter("All Statuses");
   };
 
-  // ✅ Update status
+  // ✅ Update status + send notification
   const handleValidation = async (status) => {
     if (!selectedRecord) return;
     try {
@@ -175,9 +175,21 @@ const DswdValidation = () => {
         return;
       }
 
+      // Update record status
       const recordRef = ref(rtdb, `senior_citizens/${selectedRecord.id}`);
       await update(recordRef, { status });
-      alert(`✅ Record updated to ${status}`);
+
+      // Push notification to barangay
+      const notifRef = ref(rtdb, `notifications/${selectedRecord.barangay}`);
+      const newNotifRef = push(notifRef);
+      await set(newNotifRef, {
+        message: `Senior ${selectedRecord.name} has been marked as ${status} by DSWD.`,
+        read: false,
+        timestamp: new Date().toISOString(),
+        type: status === "Eligible" ? "success" : "info",
+      });
+
+      alert(`✅ Record updated to ${status} and notification sent.`);
       setSelectedRecord(null);
     } catch (error) {
       console.error(error);

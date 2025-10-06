@@ -52,7 +52,7 @@ const routes = createBrowserRouter([
   // ------------------------------
   {
     path: "/",
-    element: <Login />,
+    element: <Login />, // Para palitan ng sa User <MainLayout />, ito lang ang ipapalit
     errorElement: <NotFound />,
     children: [
       { index: true, element: <LandingPage /> },
