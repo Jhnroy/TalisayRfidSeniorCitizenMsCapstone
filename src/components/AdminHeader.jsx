@@ -6,9 +6,13 @@ import TalisayLogo from "../assets/Talisay-Logo.png";
 import { auth } from "../router/Firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
+// React Router
+import { useNavigate } from "react-router-dom";
+
 const AdminHeader = ({ setSidebarOpen }) => {
   const [adminInfo, setAdminInfo] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const navigate = useNavigate(); // ✅ useNavigate for safe routing
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -27,18 +31,19 @@ const AdminHeader = ({ setSidebarOpen }) => {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Updated logout with redirect
+  // ✅ Safe Logout + Redirect
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setShowProfileModal(false);
-      window.location.href = "/"; // redirect to home/login page
+      navigate("/", { replace: true }); // ✅ Safe redirect to login/home
     } catch (error) {
       console.error("Logout error:", error);
+      alert("Error logging out. Please try again.");
     }
   };
 
-  // Close modal if clicking outside
+  // ✅ Close modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showProfileModal && !event.target.closest(".profile-modal")) {
@@ -47,8 +52,7 @@ const AdminHeader = ({ setSidebarOpen }) => {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showProfileModal]);
 
   return (
@@ -90,7 +94,9 @@ const AdminHeader = ({ setSidebarOpen }) => {
                     {adminInfo.role}
                   </span>
                 </p>
-                <p className="text-sm text-gray-500 truncate">{adminInfo.email}</p>
+                <p className="text-sm text-gray-500 truncate">
+                  {adminInfo.email}
+                </p>
               </div>
             </div>
           ) : (
