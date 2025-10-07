@@ -100,7 +100,7 @@ const MswdHeader = ({ setSidebarOpen }) => {
     try {
       await signOut(auth);
       setShowModal(false);
-      window.location.href = "/login";
+      window.location.href = "/";
     } catch (err) {
       console.error("Logout failed:", err);
     }

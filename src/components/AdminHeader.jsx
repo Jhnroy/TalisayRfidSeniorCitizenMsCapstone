@@ -12,8 +12,6 @@ const AdminHeader = ({ setSidebarOpen }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("Current Admin:", user);
-
       if (user) {
         setAdminInfo({
           name: user.displayName?.trim() || "rascojohnroy",
@@ -29,16 +27,18 @@ const AdminHeader = ({ setSidebarOpen }) => {
     return () => unsubscribe();
   }, []);
 
+  // ✅ Updated logout with redirect
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setShowProfileModal(false);
-      console.log("User logged out successfully");
+      window.location.href = "/"; // redirect to home/login page
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
+  // Close modal if clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showProfileModal && !event.target.closest(".profile-modal")) {

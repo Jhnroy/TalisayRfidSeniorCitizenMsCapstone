@@ -34,11 +34,9 @@ import Masterlist from "../pages/superAdmin/Masterlist";
 import SuperAdminCalendar from "../pages/superAdmin/SuperAdminCalendar";
 
 // DSWD
-
 import DswdMasterlist from "../pages/dswdPage/DswdMasterlist";
 import DswdPension from "../pages/dswdPage/DswdPension";
 import DswdValidation from "../pages/dswdPage/DswdValidation";
-
 
 // Not Found
 import NotFound from "../pages/NotFound";
@@ -50,20 +48,14 @@ const routes = createBrowserRouter([
   // ------------------------------
   // Public Routes
   // ------------------------------
-//   {
-//   path: "/",
-//   element: <Login />, // or some wrapper with <Outlet />
-//   errorElement: <NotFound />,
-//   children: [
-//     { index: true, element: <LandingPage /> },
-//     { path: "login", element: <Login /> },
-//     { path: "signup", element: <SignUp /> },
-//   ],
-// },
-
-  { path: "/", element: <Login /> },         // default first page = Login
-  { path: "/signup", element: <SignUp /> }, // SignUp page
-  { path: "*", element: <NotFound /> },
+  {
+    path: "/",
+    element: <Login />, // Default landing page
+  },
+  {
+    path: "/signup",
+    element: <SignUp />,
+  },
 
   // ------------------------------
   // OSCA Admin (Moderator)
@@ -79,8 +71,8 @@ const routes = createBrowserRouter([
       { index: true, element: <AdminDashboard /> },
       { path: "senior-citizen", element: <SeniorcitizenList /> },
       { path: "pending", element: <Pending /> },
-      { path: "admin-registrants", element: <AdminRegistrants /> },
-      { path: "admin-masterlist", element: <AdminMasterlist /> },
+      { path: "registrants", element: <AdminRegistrants /> },
+      { path: "masterlist", element: <AdminMasterlist /> },
       { path: "pension", element: <Pension /> },
       { path: "archive", element: <Archive /> },
       { path: "calendar", element: <Calendar /> },
@@ -102,7 +94,7 @@ const routes = createBrowserRouter([
       { index: true, element: <SuperAdminDashboard /> },
       { path: "registrants", element: <SuperAdminRegistrants /> },
       { path: "validation", element: <Validation /> },
-      { path: "super-admin-calendar", element: <SuperAdminCalendar /> },
+      { path: "calendar", element: <SuperAdminCalendar /> },
       { path: "rfid-binding", element: <RfidBinding /> },
       { path: "masterlist", element: <Masterlist /> },
     ],
@@ -120,8 +112,8 @@ const routes = createBrowserRouter([
     ),
     children: [
       { index: true, element: <DswdMasterlist /> },
-      { path: "dswd-pension", element: <DswdPension /> },
-      { path: "dswd-validation", element: <DswdValidation /> },
+      { path: "pension", element: <DswdPension /> },
+      { path: "validation", element: <DswdValidation /> },
     ],
   },
 
