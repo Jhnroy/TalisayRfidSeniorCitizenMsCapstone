@@ -28,7 +28,7 @@ const SuperAdminSidebar = () => {
       //   { label: "Validation", icon: <FaCheckCircle />, path: "/super-admin/validation" },
       // ],
     },
-    { label: "Calendar", icon: <FaCalendarAlt />, path: "/super-admin/super-admin-calendar" },
+    { label: "Calendar", icon: <FaCalendarAlt />, path: "/super-admin/calendar" },
     {label: "RFID Binding", icon: <FaFileAlt />, path: "/super-admin/rfid-binding", exact: true},
     { label: "Masterlist", icon: <FaFileAlt />, path: "/super-admin/masterlist" },
     // { label: "Admin Management", icon: <FaUsersCog />, path: "/super-admin/admin-management" },

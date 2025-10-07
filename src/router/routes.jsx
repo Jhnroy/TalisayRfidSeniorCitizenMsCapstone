@@ -72,7 +72,7 @@ const routes = createBrowserRouter([
       { path: "senior-citizen", element: <SeniorcitizenList /> },
       { path: "pending", element: <Pending /> },
       { path: "registrants", element: <AdminRegistrants /> },
-      { path: "masterlist", element: <AdminMasterlist /> },
+      { path: "admin-masterlist", element: <AdminMasterlist /> },
       { path: "pension", element: <Pension /> },
       { path: "archive", element: <Archive /> },
       { path: "calendar", element: <Calendar /> },
