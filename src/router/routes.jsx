@@ -50,16 +50,20 @@ const routes = createBrowserRouter([
   // ------------------------------
   // Public Routes
   // ------------------------------
-  {
-  path: "/",
-  element: <MainLayout />, // or some wrapper with <Outlet />
-  errorElement: <NotFound />,
-  children: [
-    { index: true, element: <LandingPage /> },
-    { path: "login", element: <Login /> },
-    { path: "signup", element: <SignUp /> },
-  ],
-},
+//   {
+//   path: "/",
+//   element: <Login />, // or some wrapper with <Outlet />
+//   errorElement: <NotFound />,
+//   children: [
+//     { index: true, element: <LandingPage /> },
+//     { path: "login", element: <Login /> },
+//     { path: "signup", element: <SignUp /> },
+//   ],
+// },
+
+  { path: "/", element: <Login /> },         // default first page = Login
+  { path: "/signup", element: <SignUp /> }, // SignUp page
+  { path: "*", element: <NotFound /> },
 
   // ------------------------------
   // OSCA Admin (Moderator)
