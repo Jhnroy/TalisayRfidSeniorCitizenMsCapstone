@@ -51,15 +51,15 @@ const routes = createBrowserRouter([
   // Public Routes
   // ------------------------------
   {
-    path: "/",
-    element: <Login />, // Para palitan ng sa User <MainLayout />, ito lang ang ipapalit
-    errorElement: <NotFound />,
-    children: [
-      { index: true, element: <LandingPage /> },
-      { path: "login", element: <Login /> },
-      { path: "signup", element: <SignUp /> },
-    ],
-  },
+  path: "/",
+  element: <MainLayout />, // or some wrapper with <Outlet />
+  errorElement: <NotFound />,
+  children: [
+    { index: true, element: <LandingPage /> },
+    { path: "login", element: <Login /> },
+    { path: "signup", element: <SignUp /> },
+  ],
+},
 
   // ------------------------------
   // OSCA Admin (Moderator)

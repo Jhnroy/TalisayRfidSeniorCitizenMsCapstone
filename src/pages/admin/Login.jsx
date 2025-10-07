@@ -163,14 +163,14 @@ const Login = () => {
           </button>
         </p>
 
-        <div className="mt-4 text-center">
+        {/* <div className="mt-4 text-center">
           <button
             onClick={handleLogout}
             className="text-red-500 underline text-sm"
           >
             Logout
           </button>
-        </div>
+        </div> */}
       </div>
     </div>
   );
