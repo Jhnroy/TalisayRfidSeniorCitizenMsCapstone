@@ -53,14 +53,14 @@ const isUpcoming = (birthDate, targetAge) => {
   return turningAge === targetAge;
 };
 
-// ✅ Modal component
+// ✅ Modal with blurred background
 const ClaimStatusModal = ({ person, onClose, onMarkClaimed, onMarkNotClaimed }) => {
   if (!person) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-gray-100">
+        <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">
           Benefit Claim Status
         </h2>
 
@@ -157,7 +157,6 @@ const SuperAdminDashboard = () => {
         })
         .filter((p) => p.age !== null);
 
-      // Categorize
       setCurrentOcto(processed.filter((p) => p.age >= 80 && p.age < 90));
       setCurrentNona(processed.filter((p) => p.age >= 90 && p.age < 100));
       setCurrentCente(processed.filter((p) => p.age >= 100));
@@ -166,7 +165,6 @@ const SuperAdminDashboard = () => {
       setUpcomingNona(processed.filter((p) => isUpcoming(p.birthday, 90)));
       setUpcomingCente(processed.filter((p) => isUpcoming(p.birthday, 100)));
 
-      // Compute not claimed count
       const notClaimedCount = processed.filter((p) => !p.claimed).length;
 
       const unsubEligible = onValue(eligibleRef, (esnap) => {
@@ -236,7 +234,7 @@ const SuperAdminDashboard = () => {
 
   // Table component
   const BeneficiaryTable = ({ title, color, benefit, data, showClaimStatus }) => (
-    <div className="bg-white shadow rounded-lg p-6">
+    <div className="bg-white shadow rounded-lg p-6 backdrop-blur-sm bg-opacity-95">
       <h3 className={`text-lg font-bold mb-4 ${color}`}>{title}</h3>
       {data.length === 0 ? (
         <p className="text-gray-500">No beneficiaries.</p>
@@ -294,13 +292,12 @@ const SuperAdminDashboard = () => {
     return <div className="p-6 text-center text-gray-500">Loading dashboard...</div>;
 
   return (
-    <div className="p-6 space-y-10 bg-gray-50 min-h-screen">
+    <div className="p-6 space-y-10 bg-gradient-to-br from-blue-50 via-gray-100 to-blue-100 min-h-screen">
       {/* Header */}
       <h1 className="text-3xl font-bold text-gray-800">Dashboard Overview</h1>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total */}
         <div className="bg-white shadow rounded-xl flex items-center gap-4 p-5">
           <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-blue-100 text-blue-600">
             <FaUsers />
@@ -311,7 +308,6 @@ const SuperAdminDashboard = () => {
           </div>
         </div>
 
-        {/* Eligible */}
         <div className="bg-white shadow rounded-xl flex items-center gap-4 p-5">
           <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-green-100 text-green-600">
             <FaCheckCircle />
@@ -322,7 +318,6 @@ const SuperAdminDashboard = () => {
           </div>
         </div>
 
-        {/* Active */}
         <div className="bg-white shadow rounded-xl flex items-center gap-4 p-5">
           <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-yellow-100 text-yellow-600">
             <FaUser />
@@ -333,7 +328,6 @@ const SuperAdminDashboard = () => {
           </div>
         </div>
 
-        {/* Not Claimed */}
         <div className="bg-white shadow rounded-xl flex items-center gap-4 p-5">
           <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-red-100 text-red-600">
             <FaTimesCircle />

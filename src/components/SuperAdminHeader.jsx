@@ -12,6 +12,7 @@ import {
   onValue,
   update,
 } from "firebase/database";
+import { useNavigate } from "react-router-dom"; // ✅ Import navigate
 
 const MswdHeader = ({ setSidebarOpen }) => {
   const [userInfo, setUserInfo] = useState(null);
@@ -19,8 +20,9 @@ const MswdHeader = ({ setSidebarOpen }) => {
   const [loading, setLoading] = useState(true);
   const [showNotif, setShowNotif] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const navigate = useNavigate(); // ✅ Initialize navigation
 
-  // ✅ Fetch logged in user info
+  // ✅ Fetch logged-in user info
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -39,7 +41,7 @@ const MswdHeader = ({ setSidebarOpen }) => {
               name: data?.name || user.displayName || user.email.split("@")[0],
               email: data?.email || user.email,
               photo: user.photoURL || null,
-              role: "MSWD", // ✅ Correct role
+              role: "MSWD",
             });
           } else {
             setUserInfo({
@@ -95,14 +97,15 @@ const MswdHeader = ({ setSidebarOpen }) => {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Logout
+  // ✅ Logout with redirect
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setShowModal(false);
-      window.location.href = "/";
+      navigate("/", { replace: true }); // ✅ Proper router redirect
     } catch (err) {
       console.error("Logout failed:", err);
+      alert("Failed to log out. Please try again.");
     }
   };
 
@@ -122,7 +125,6 @@ const MswdHeader = ({ setSidebarOpen }) => {
       <header className="fixed top-0 left-0 md:left-64 right-0 h-16 bg-gray-200 shadow px-4 md:px-6 flex items-center justify-between z-30">
         {/* Left Section */}
         <div className="flex items-center gap-3 md:gap-4">
-          {/* Sidebar toggle only for mobile */}
           <button
             className="md:hidden text-gray-600 text-xl"
             onClick={() => setSidebarOpen(true)}
@@ -154,7 +156,7 @@ const MswdHeader = ({ setSidebarOpen }) => {
               )}
             </button>
 
-            {/* Dropdown */}
+            {/* Notifications Dropdown */}
             {showNotif && (
               <div className="absolute right-0 mt-2 w-64 sm:w-80 bg-white shadow-lg rounded-lg border z-50">
                 <div className="p-3 border-b font-semibold text-gray-700 text-sm md:text-base">

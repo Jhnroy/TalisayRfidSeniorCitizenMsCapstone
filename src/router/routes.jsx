@@ -113,7 +113,7 @@ const routes = createBrowserRouter([
     children: [
       { index: true, element: <DswdMasterlist /> },
       { path: "pension", element: <DswdPension /> },
-      { path: "validation", element: <DswdValidation /> },
+      { path: "dswd-validation", element: <DswdValidation /> },
     ],
   },
 
