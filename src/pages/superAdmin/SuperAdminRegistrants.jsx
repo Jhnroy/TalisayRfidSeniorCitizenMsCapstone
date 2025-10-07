@@ -96,7 +96,6 @@ const Registrant = () => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    // Ensure only numbers for contact fields, max 11
     if ((name === "contactNumber" || name === "emergencyContact") && value) {
       const numeric = value.replace(/\D/g, "");
       if (numeric.length <= 11) {
@@ -150,8 +149,15 @@ const Registrant = () => {
 
   return (
     <div className="p-6">
+      {/* Header */}
       <div className="flex justify-between items-center mb-2">
         <h1 className="text-2xl font-bold">Senior Citizens</h1>
+        <button
+          onClick={handleAdd}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+        >
+          <FaPlus /> Add Senior
+        </button>
       </div>
 
       {/* Filters */}
@@ -201,7 +207,9 @@ const Registrant = () => {
           <tbody>
             {filteredData.map((item) => (
               <tr key={item.id} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-2">{item.firstName} {item.middleName || ""} {item.lastName}</td>
+                <td className="px-4 py-2">
+                  {item.firstName} {item.middleName || ""} {item.lastName}
+                </td>
                 <td className="px-4 py-2">{item.barangay}</td>
                 <td className="px-4 py-2">{item.age}</td>
                 <td className="px-4 py-2">{formatDate(item.dateOfBirth)}</td>
@@ -214,7 +222,9 @@ const Registrant = () => {
             ))}
             {filteredData.length === 0 && (
               <tr>
-                <td colSpan="6" className="text-center text-gray-500 py-4">No records found.</td>
+                <td colSpan="6" className="text-center text-gray-500 py-4">
+                  No records found.
+                </td>
               </tr>
             )}
           </tbody>
@@ -223,60 +233,132 @@ const Registrant = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
-            <h2 className="text-xl font-bold mb-4">{editingItem ? "Edit Senior" : "Add Senior"}</h2>
+            <h2 className="text-xl font-bold mb-4">
+              {editingItem ? "Edit Senior" : "Add Senior"}
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-3">
+              {/* Name Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input name="firstName" value={form.firstName} onChange={handleChange} placeholder="First Name" className="border p-2 rounded-lg w-full" required />
-                <input name="middleName" value={form.middleName} onChange={handleChange} placeholder="Middle Name" className="border p-2 rounded-lg w-full" />
+                <div>
+                  <label className="block text-sm font-semibold">First Name</label>
+                  <input name="firstName" value={form.firstName} onChange={handleChange} className="border p-2 rounded-lg w-full" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold">Middle Name</label>
+                  <input name="middleName" value={form.middleName} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+                </div>
               </div>
-              <input name="lastName" value={form.lastName} onChange={handleChange} placeholder="Last Name" className="border p-2 rounded-lg w-full" required />
-              <input name="gender" value={form.gender} onChange={handleChange} placeholder="Gender" className="border p-2 rounded-lg w-full" />
+              <div>
+                <label className="block text-sm font-semibold">Last Name</label>
+                <input name="lastName" value={form.lastName} onChange={handleChange} className="border p-2 rounded-lg w-full" required />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Gender</label>
+                <input name="gender" value={form.gender} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input name="houseNo" value={form.houseNo} onChange={handleChange} placeholder="House No." className="border p-2 rounded-lg w-full" />
-                
-               <select
-                  name="purok"
-                  value={form.purok}
-                  onChange={handleChange}
-                  className="border p-2 rounded-lg w-full"
-                  required
-                >
-                  <option value="">Select Purok</option>
-                  {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                    <option key={num} value={`Purok ${num}`}>Purok {num}</option>
-                  ))}
-                </select>
-
-                
+                <div>
+                  <label className="block text-sm font-semibold">House No.</label>
+                  <input name="houseNo" value={form.houseNo} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold">Purok</label>
+                  <select name="purok" value={form.purok} onChange={handleChange} className="border p-2 rounded-lg w-full" required>
+                    <option value="">Select Purok</option>
+                    {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                      <option key={num} value={`Purok ${num}`}>Purok {num}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <select name="barangay" value={form.barangay} onChange={handleChange} className="border p-2 rounded-lg w-full" required>
-                <option value="">Select Barangay</option>
-                {barangays.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
+              <div>
+                <label className="block text-sm font-semibold">Barangay</label>
+                <select name="barangay" value={form.barangay} onChange={handleChange} className="border p-2 rounded-lg w-full" required>
+                  <option value="">Select Barangay</option>
+                  {barangays.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
 
-              <input name="municipality" value="Talisay" readOnly className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" />
-              <input name="province" value="Camarines Norte" readOnly className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" />
+              <div>
+                <label className="block text-sm font-semibold">Municipality</label>
+                <input name="municipality" value="Talisay" readOnly className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" />
+              </div>
 
-              <input type="number" name="age" value={form.age} onChange={handleChange} placeholder="Age" className="border p-2 rounded-lg w-full" />
-              <input type="date" name="dateOfBirth" value={formatDate(form.dateOfBirth)} onChange={handleChange} className="border p-2 rounded-lg w-full" />
-              <input name="contactNumber" value={form.contactNumber} onChange={handleChange} placeholder="Contact Number" className="border p-2 rounded-lg w-full" />
-              <input name="disability" value={form.disability} onChange={handleChange} placeholder="Disability" className="border p-2 rounded-lg w-full" />
-              <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} /> Consent
-              <input name="emergencyName" value={form.emergencyName} onChange={handleChange} placeholder="Emergency Name" className="border p-2 rounded-lg w-full" />
-              <input name="emergencyContact" value={form.emergencyContact} onChange={handleChange} placeholder="Emergency Contact" className="border p-2 rounded-lg w-full" />
-              <input name="emergencyRelationship" value={form.emergencyRelationship} onChange={handleChange} placeholder="Emergency Relationship" className="border p-2 rounded-lg w-full" />
-              <input type="checkbox" name="claimed" checked={form.claimed} onChange={handleChange} /> Claimed
-              <input name="claimedDate" type="text" value={form.claimedDate} onChange={handleChange} placeholder="Claimed Date" className="border p-2 rounded-lg w-full" />
-              <input name="status" value={form.status} readOnly className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" />
-              <input name="seniorId" value={form.seniorId} onChange={handleChange} placeholder="Senior ID" className="border p-2 rounded-lg w-full" />
+              <div>
+                <label className="block text-sm font-semibold">Province</label>
+                <input name="province" value="Camarines Norte" readOnly className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Age</label>
+                <input type="number" name="age" value={form.age} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Date of Birth</label>
+                <input type="date" name="dateOfBirth" value={formatDate(form.dateOfBirth)} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Contact Number</label>
+                <input name="contactNumber" value={form.contactNumber} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Disability</label>
+                <input name="disability" value={form.disability} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="consent" checked={form.consent} onChange={handleChange} />
+                <label className="text-sm font-semibold">Consent</label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Emergency Contact Name</label>
+                <input name="emergencyName" value={form.emergencyName} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Emergency Contact Number</label>
+                <input name="emergencyContact" value={form.emergencyContact} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Relationship</label>
+                <input name="emergencyRelationship" value={form.emergencyRelationship} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="claimed" checked={form.claimed} onChange={handleChange} />
+                <label className="text-sm font-semibold">Claimed</label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Claimed Date</label>
+                <input name="claimedDate" type="text" value={form.claimedDate} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Status</label>
+                <input name="status" value={form.status} readOnly className="border p-2 rounded-lg w-full bg-gray-100 cursor-not-allowed" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold">Senior ID</label>
+                <input name="seniorId" value={form.seniorId} onChange={handleChange} className="border p-2 rounded-lg w-full" />
+              </div>
 
               <div className="flex justify-end gap-3 mt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400">Cancel</button>
-                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">{editingItem ? "Update" : "Save"}</button>
+                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                  {editingItem ? "Update" : "Save"}
+                </button>
               </div>
             </form>
           </div>
