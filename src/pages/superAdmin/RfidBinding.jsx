@@ -7,6 +7,7 @@ import { ref, onValue, set, update, get } from "firebase/database";
 const RfidBinding = () => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [rfidCode, setRfidCode] = useState("");
+  const [lastProcessedUID, setLastProcessedUID] = useState(""); // ✅ prevent repeat reads
   const [bindings, setBindings] = useState([]);
   const [members, setMembers] = useState([]);
   const [barangayFilter, setBarangayFilter] = useState("All Barangays");
@@ -23,13 +24,16 @@ const RfidBinding = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         setDeviceOnline(data?.online || false);
-        if (data?.lastUID) {
+
+        // ✅ Prevent reading the same UID twice
+        if (data?.lastUID && data.lastUID !== lastProcessedUID) {
           setRfidCode(data.lastUID);
+          setLastProcessedUID(data.lastUID);
         }
       }
     });
     return () => unsub();
-  }, []);
+  }, [lastProcessedUID]);
 
   // 🔹 Fetch eligible members
   useEffect(() => {
@@ -82,6 +86,7 @@ const RfidBinding = () => {
     setSelectedMember(member);
     setBindMessage("");
     setRfidCode("");
+    setLastProcessedUID("");
   };
 
   // 🔹 Start Scan
@@ -92,11 +97,16 @@ const RfidBinding = () => {
     }
     try {
       const scannerRef = ref(rtdb, "device/scanner");
+
+      // ✅ Clear the lastUID before starting new scan
       await update(scannerRef, {
         startScan: true,
         lastUID: "",
         timestamp: Date.now(),
       });
+
+      setRfidCode("");
+      setLastProcessedUID("");
       setBindMessage("📡 Waiting for RFID scan...");
     } catch (err) {
       console.error("❌ Failed to request scan:", err);
@@ -138,17 +148,22 @@ const RfidBinding = () => {
         lastClaimDate: null,
       };
 
+      // ✅ Save binding to RTDB
       await set(bindingRef, newBinding);
+
+      // ✅ Update member record
       await update(ref(rtdb, `eligible/${selectedMember.id}`), {
         rfidCode,
         status: "Bound",
       });
 
+      // ✅ Reset scanner field to prevent leaving the last scanned code
       await update(ref(rtdb, "device/scanner"), { lastUID: "" });
 
       setBindMessage("✅ RFID successfully bound!");
       setSelectedMember(null);
       setRfidCode("");
+      setLastProcessedUID("");
     } catch (err) {
       console.error("❌ Failed to bind RFID:", err);
       setBindMessage("❌ Error binding RFID. Check console.");
