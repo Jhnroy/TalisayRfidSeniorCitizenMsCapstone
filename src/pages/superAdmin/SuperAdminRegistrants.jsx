@@ -152,12 +152,12 @@ const Registrant = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-2">
         <h1 className="text-2xl font-bold">Senior Citizens</h1>
-        <button
+        {/* <button
           onClick={handleAdd}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
         >
           <FaPlus /> Add Senior
-        </button>
+        </button> */}
       </div>
 
       {/* Filters */}

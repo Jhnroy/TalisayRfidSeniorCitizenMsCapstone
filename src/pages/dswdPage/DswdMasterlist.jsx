@@ -51,7 +51,11 @@ const getAge = (dateStr) => {
 
 const Masterlist = () => {
   const [activeTab, setActiveTab] = useState("overall");
-  const [records, setRecords] = useState({ overall: [], pensioners: [] });
+  const [records, setRecords] = useState({
+    overall: [],
+    pensioners: [],
+    recent: [],
+  });
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -69,7 +73,7 @@ const Masterlist = () => {
 
     const mergeData = (seniorsSnap, rfidSnap) => {
       if (!seniorsSnap.exists()) {
-        setRecords({ overall: [], pensioners: [] });
+        setRecords({ overall: [], pensioners: [], recent: [] });
         setFilteredRecords([]);
         setLoading(false);
         return;
@@ -101,15 +105,25 @@ const Masterlist = () => {
           lastClaim: rfidInfo.lastClaimDate
             ? formatDate(rfidInfo.lastClaimDate)
             : "Never",
+          lastUpdated: value.lastUpdated || null,
         };
       });
 
+      // Create subsets
       const overall = seniorsArray;
       const pensioners = seniorsArray.filter(
         (row) => row.status === "Eligible"
       );
 
-      setRecords({ overall, pensioners });
+      const now = new Date();
+      const recent = seniorsArray.filter((row) => {
+        if (!row.lastUpdated) return false;
+        const updatedDate = new Date(row.lastUpdated);
+        const diffDays = (now - updatedDate) / (1000 * 60 * 60 * 24);
+        return diffDays <= 7; // ✅ Updated within last 7 days
+      });
+
+      setRecords({ overall, pensioners, recent });
       setFilteredRecords(overall);
       setLoading(false);
     };
@@ -133,8 +147,11 @@ const Masterlist = () => {
   // Filters
   useEffect(() => {
     if (loading) return;
-    let sourceData =
-      activeTab === "overall" ? records.overall : records.pensioners;
+    let sourceData = [];
+    if (activeTab === "overall") sourceData = records.overall;
+    else if (activeTab === "pensioners") sourceData = records.pensioners;
+    else if (activeTab === "recent") sourceData = records.recent;
+
     let filtered = [...sourceData];
 
     if (search.trim() !== "")
@@ -166,11 +183,10 @@ const Masterlist = () => {
     setActiveTab("overall");
   };
 
-  // ✅ Eligibility check against pensionAgencies
+  // ✅ Validation with timestamp for recent tab
   const handleValidation = async (status) => {
     if (!selectedRecord) return;
     try {
-      // Check existing pensions
       const agencies = ["AFP", "GSIS", "PVAO", "SSS"];
       let hasExistingPension = false;
 
@@ -194,7 +210,10 @@ const Masterlist = () => {
       }
 
       const recordRef = ref(rtdb, `senior_citizens/${selectedRecord.id}`);
-      await update(recordRef, { status });
+      await update(recordRef, {
+        status,
+        lastUpdated: new Date().toISOString(), // ✅ add recent timestamp
+      });
       alert(`✅ Record updated to ${status}`);
       setSelectedRecord(null);
     } catch (error) {
@@ -271,6 +290,16 @@ const Masterlist = () => {
         >
           Pensioners
         </button>
+        <button
+          onClick={() => setActiveTab("recent")}
+          className={`px-6 py-2 rounded-t-lg font-semibold ${
+            activeTab === "recent"
+              ? "bg-orange-500 text-white"
+              : "bg-gray-200 text-gray-700"
+          }`}
+        >
+          Recent
+        </button>
       </div>
 
       {/* Table */}
@@ -292,6 +321,9 @@ const Masterlist = () => {
                 <th className="px-4 py-2">Pension Received</th>
                 <th className="px-4 py-2">Missed Consecutive</th>
                 <th className="px-4 py-2">Last Claim Date</th>
+                {activeTab === "recent" && (
+                  <th className="px-4 py-2">Last Updated</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -333,16 +365,15 @@ const Masterlist = () => {
                   <td>{row.pensionReceived}</td>
                   <td>{row.missed}</td>
                   <td>{row.lastClaim}</td>
+                  {activeTab === "recent" && (
+                    <td>{row.lastUpdated ? formatDate(row.lastUpdated) : "-"}</td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
-
-      {/* Modal */}
-      
-      
     </div>
   );
 };

@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import logo from "../../assets/Talisay-Logo.png"; // ✅ logo import
 
+// ✅ Barangay List
 const barangays = [
   "Binanuun",
   "Caawigan",
@@ -23,6 +24,7 @@ const barangays = [
   "Sto. Niño",
 ];
 
+// ✅ Helper: Format date
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
   try {
@@ -42,7 +44,12 @@ const formatDate = (dateStr) => {
 
 const Masterlist = () => {
   const [activeTab, setActiveTab] = useState("overall");
-  const [records, setRecords] = useState({ overall: [], pensioners: [] });
+  const [records, setRecords] = useState({
+    overall: [],
+    pensioners: [],
+    pending: [],
+    members: [],
+  });
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,7 +57,7 @@ const Masterlist = () => {
   const [barangayFilter, setBarangayFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // ✅ Fetch data
+  // ✅ Fetch data from Firebase
   useEffect(() => {
     const seniorsRef = ref(rtdb, "senior_citizens");
     const rfidRef = ref(rtdb, "rfidBindings");
@@ -60,7 +67,7 @@ const Masterlist = () => {
 
     const handleData = (seniorsSnap, rfidSnap) => {
       if (!seniorsSnap.exists()) {
-        setRecords({ overall: [], pensioners: [] });
+        setRecords({ overall: [], pensioners: [], pending: [], members: [] });
         setFilteredRecords([]);
         setLoading(false);
         return;
@@ -82,7 +89,8 @@ const Masterlist = () => {
           extName: value.extName || "",
           barangay: value.barangay || "-",
           birthday: formatDate(value.dateOfBirth),
-          status: value.status || "Active",
+          status: value.status || "Pending",
+          validated: value.validated || false,
           rfidStatus: rfidInfo.status || "Not Bound",
           rfidCode: rfidInfo.rfidCode || "-",
           pensionReceived: rfidInfo.pensionReceived ? "Yes" : "No",
@@ -93,24 +101,29 @@ const Masterlist = () => {
         };
       });
 
+      // ✅ Categorize for tabs
       const overall = seniorsArray;
-      const pensioners = seniorsArray.filter(
-        (row) => row.status === "Eligible"
+      const pensioners = seniorsArray.filter((r) => r.status === "Eligible");
+      const pending = seniorsArray.filter(
+        (r) => r.status === "Pending" && !r.validated
       );
+      const members = seniorsArray.filter((r) => r.status === "Active");
 
-      setRecords({ overall, pensioners });
+      setRecords({ overall, pensioners, pending, members });
       setFilteredRecords(overall);
       setLoading(false);
     };
 
     const unsubSeniors = onValue(seniorsRef, (snap) => {
       seniorsSnapData = snap;
-      if (seniorsSnapData && rfidSnapData) handleData(seniorsSnapData, rfidSnapData);
+      if (seniorsSnapData && rfidSnapData)
+        handleData(seniorsSnapData, rfidSnapData);
     });
 
     const unsubRfid = onValue(rfidRef, (snap) => {
       rfidSnapData = snap;
-      if (seniorsSnapData && rfidSnapData) handleData(seniorsSnapData, rfidSnapData);
+      if (seniorsSnapData && rfidSnapData)
+        handleData(seniorsSnapData, rfidSnapData);
     });
 
     return () => {
@@ -119,16 +132,21 @@ const Masterlist = () => {
     };
   }, []);
 
-  // ✅ Filters
+  // ✅ Apply filters
   useEffect(() => {
     if (loading) return;
-    let sourceData =
-      activeTab === "overall" ? records.overall : records.pensioners;
-    let filtered = [...sourceData];
 
-    if (search.trim() !== "") {
-      filtered = filtered.filter((row) =>
-        `${row.surname}, ${row.firstName} ${row.middleName} ${row.extName}`
+    let data;
+    if (activeTab === "overall") data = records.overall;
+    else if (activeTab === "pensioners") data = records.pensioners;
+    else if (activeTab === "pending") data = records.pending;
+    else data = records.members;
+
+    let filtered = [...data];
+
+    if (search.trim()) {
+      filtered = filtered.filter((r) =>
+        `${r.surname}, ${r.firstName} ${r.middleName} ${r.extName}`
           .toLowerCase()
           .includes(search.toLowerCase())
       );
@@ -136,14 +154,13 @@ const Masterlist = () => {
 
     if (barangayFilter !== "All") {
       filtered = filtered.filter(
-        (row) => row.barangay?.toLowerCase() === barangayFilter.toLowerCase()
+        (r) => r.barangay?.toLowerCase() === barangayFilter.toLowerCase()
       );
     }
 
     if (statusFilter !== "All" && activeTab === "overall") {
       filtered = filtered.filter(
-        (row) =>
-          (row.status || "Active").toLowerCase() === statusFilter.toLowerCase()
+        (r) => (r.status || "Active").toLowerCase() === statusFilter.toLowerCase()
       );
     }
 
@@ -157,139 +174,137 @@ const Masterlist = () => {
     setActiveTab("overall");
   };
 
-  // ✅ Generate Excel Report with Enhanced Design + Logo under header
+  // ✅ Generate Excel
   const generateReport = async () => {
-  const eligibleBound = records.overall.filter(
-    (row) => row.status === "Eligible" && row.rfidStatus === "Bound"
-  );
+    const eligibleBound = records.overall.filter(
+      (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
+    );
 
-  if (eligibleBound.length === 0) {
-    alert("No eligible and bound records found.");
-    return;
-  }
+    if (eligibleBound.length === 0) {
+      alert("No eligible and bound records found.");
+      return;
+    }
 
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("Eligible Pensioners");
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Eligible Pensioners");
 
-  // 🧠 Adjust column widths early for better layout
-  worksheet.columns = Array(9)
-    .fill()
-    .map(() => ({ width: 18 }));
+    worksheet.columns = Array(9)
+      .fill()
+      .map(() => ({ width: 18 }));
 
-  // 🟦 Add Logo (Left Side)
-  const response = await fetch(logo);
-  const imageBuffer = await response.arrayBuffer();
-  const imageId = workbook.addImage({
-    buffer: imageBuffer,
-    extension: "png",
-  });
+    const response = await fetch(logo);
+    const imageBuffer = await response.arrayBuffer();
+    const imageId = workbook.addImage({
+      buffer: imageBuffer,
+      extension: "png",
+    });
 
-  worksheet.addImage(imageId, {
-    tl: { col:2.5, row: 0.5 }, // Left side position
-    ext: { width: 100, height: 100 }, // Scaled image size
-  });
+    worksheet.addImage(imageId, {
+      tl: { col: 2.5, row: 0.5 },
+      ext: { width: 100, height: 100 },
+    });
 
-  // 🏛️ Title Section (Centered beside logo)
-  worksheet.mergeCells("C2", "H2");
-  const titleCell = worksheet.getCell("C2");
-  titleCell.value = "Municipality of Talisay - Senior Citizen Office";
-  titleCell.font = { size: 16, bold: true, color: { argb: "FF1F497D" } };
-  titleCell.alignment = { vertical: "middle", horizontal: "center" };
-
-  worksheet.mergeCells("C3", "H3");
-  const subCell = worksheet.getCell("C3");
-  subCell.value = "Eligible Pensioners Report";
-  subCell.font = { size: 13, bold: true };
-  subCell.alignment = { vertical: "middle", horizontal: "center" };
-
-  worksheet.mergeCells("C4", "H4");
-  const dateCell = worksheet.getCell("C4");
-  dateCell.value = `Generated on: ${new Date().toLocaleDateString()}`;
-  dateCell.font = { italic: true, size: 11, color: { argb: "FF555555" } };
-  dateCell.alignment = { vertical: "middle", horizontal: "center" };
-
-  // Add space before the table
-  worksheet.addRow([]);
-  worksheet.addRow([]);
-
-  // 🧱 Table Headers
-  const headers = [
-    "Name",
-    "Birthday",
-    "Barangay",
-    "Status",
-    "RFID Status",
-    "RFID Code",
-    "Pension Received",
-    "Missed Consecutive",
-    "Last Claim Date",
-  ];
-
-  const headerRow = worksheet.addRow(headers);
-  headerRow.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    cell.fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FF2E75B6" },
+    worksheet.mergeCells("C2", "H2");
+    worksheet.getCell("C2").value =
+      "Municipality of Talisay - Senior Citizen Office";
+    worksheet.getCell("C2").font = { size: 16, bold: true };
+    worksheet.getCell("C2").alignment = {
+      vertical: "middle",
+      horizontal: "center",
     };
-    cell.alignment = { vertical: "middle", horizontal: "center" };
-    cell.border = {
-      top: { style: "thin" },
-      bottom: { style: "thin" },
-      left: { style: "thin" },
-      right: { style: "thin" },
+
+    worksheet.mergeCells("C3", "H3");
+    worksheet.getCell("C3").value = "Eligible Pensioners Report";
+    worksheet.getCell("C3").font = { size: 13, bold: true };
+    worksheet.getCell("C3").alignment = {
+      vertical: "middle",
+      horizontal: "center",
     };
-  });
 
-  // 🧾 Data Rows
-  eligibleBound.forEach((row) => {
-    const dataRow = worksheet.addRow([
-      `${row.surname}, ${row.firstName} ${row.middleName || ""} ${
-        row.extName || ""
-      }`,
-      row.birthday,
-      row.barangay,
-      row.status,
-      row.rfidStatus,
-      row.rfidCode,
-      row.pensionReceived,
-      row.missed,
-      row.lastClaim,
-    ]);
+    worksheet.mergeCells("C4", "H4");
+    worksheet.getCell("C4").value = `Generated on: ${new Date().toLocaleDateString()}`;
+    worksheet.getCell("C4").font = { italic: true, size: 11 };
+    worksheet.getCell("C4").alignment = {
+      vertical: "middle",
+      horizontal: "center",
+    };
 
-    dataRow.eachCell((cell) => {
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+
+    const headers = [
+      "Name",
+      "Birthday",
+      "Barangay",
+      "Status",
+      "RFID Status",
+      "RFID Code",
+      "Pension Received",
+      "Missed Consecutive",
+      "Last Claim Date",
+    ];
+
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF2E75B6" },
+      };
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = {
         top: { style: "thin" },
-        bottom: { style: "thin" },
         left: { style: "thin" },
+        bottom: { style: "thin" },
         right: { style: "thin" },
       };
     });
-  });
 
-  // 🧩 Footer
-  worksheet.addRow([]);
-  worksheet.addRow([]);
-  const footer = worksheet.addRow(["Generated by Talisay SDO System"]);
-  footer.getCell(1).font = { italic: true, color: { argb: "FF888888" } };
+    eligibleBound.forEach((r) => {
+      const dataRow = worksheet.addRow([
+        `${r.surname}, ${r.firstName} ${r.middleName || ""} ${r.extName || ""}`,
+        r.birthday,
+        r.barangay,
+        r.status,
+        r.rfidStatus,
+        r.rfidCode,
+        r.pensionReceived,
+        r.missed,
+        r.lastClaim,
+      ]);
 
-  // 💾 Save File
-  const today = new Date().toISOString().split("T")[0];
-  const buffer = await workbook.xlsx.writeBuffer();
-  saveAs(
-    new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }),
-    `Eligible_Pensioners_Report_${today}.xlsx`
-  );
-};
+      dataRow.eachCell((cell) => {
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+    });
 
+    worksheet.addRow([]);
+    worksheet.addRow(["Generated by Talisay SDO System"]).getCell(1).font = {
+      italic: true,
+      color: { argb: "FF888888" },
+    };
 
-  // ✅ JSX Layout
+    const today = new Date().toISOString().split("T")[0];
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(
+      new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+      `Eligible_Pensioners_Report_${today}.xlsx`
+    );
+  };
+
+  // ✅ UI
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
+      {/* Header */}
       <div className="flex justify-between items-center bg-white shadow px-6 py-4 rounded-lg">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Masterlist</h1>
@@ -303,6 +318,7 @@ const Masterlist = () => {
         </button>
       </div>
 
+      {/* Filters */}
       <div className="mt-4 bg-white shadow p-4 rounded-lg flex flex-wrap gap-3 items-center">
         <input
           type="text"
@@ -333,6 +349,8 @@ const Masterlist = () => {
             <option value="Eligible">Eligible</option>
             <option value="Active">Active</option>
             <option value="Removed">Removed</option>
+            <option value="Pending">Pending</option>
+            <option value="Member">Member</option>
           </select>
         )}
         <button
@@ -345,26 +363,24 @@ const Masterlist = () => {
 
       {/* Tabs */}
       <div className="mt-6 flex">
-        <button
-          onClick={() => setActiveTab("overall")}
-          className={`px-6 py-2 rounded-t-lg font-semibold ${
-            activeTab === "overall"
-              ? "bg-orange-500 text-white"
-              : "bg-gray-200 text-gray-700"
-          }`}
-        >
-          Overall List
-        </button>
-        <button
-          onClick={() => setActiveTab("pensioners")}
-          className={`px-6 py-2 rounded-t-lg font-semibold ${
-            activeTab === "pensioners"
-              ? "bg-orange-500 text-white"
-              : "bg-gray-200 text-gray-700"
-          }`}
-        >
-          Pensioners
-        </button>
+        {[
+          { key: "overall", label: "Overall List" },
+          { key: "pensioners", label: "Pensioners" },
+          { key: "members", label: "Members" },
+          { key: "pending", label: "New Applicant" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-6 py-2 rounded-t-lg font-semibold ${
+              activeTab === tab.key
+                ? "bg-orange-500 text-white"
+                : "bg-gray-200 text-gray-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Table */}
@@ -389,40 +405,44 @@ const Masterlist = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredRecords.map((row, idx) => (
-                <tr key={row.id || idx} className="border-t hover:bg-gray-50">
+              {filteredRecords.map((r, i) => (
+                <tr key={r.id || i} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-2 font-medium text-gray-800">
-                    {row.surname}, {row.firstName} {row.middleName || ""}{" "}
-                    {row.extName || ""}
+                    {r.surname}, {r.firstName} {r.middleName || ""}{" "}
+                    {r.extName || ""}
                   </td>
-                  <td className="px-4 py-2">{row.birthday}</td>
-                  <td className="px-4 py-2">{row.barangay}</td>
+                  <td className="px-4 py-2">{r.birthday}</td>
+                  <td className="px-4 py-2">{r.barangay}</td>
                   <td
                     className={`px-4 py-2 font-semibold ${
-                      row.status === "Eligible"
+                      r.status === "Eligible"
                         ? "text-green-600"
-                        : row.status === "Active"
+                        : r.status === "Active"
                         ? "text-blue-600"
+                        : r.status === "Pending"
+                        ? "text-yellow-600"
+                        : r.status === "Member"
+                        ? "text-purple-600"
                         : "text-red-600"
                     }`}
                   >
-                    {row.status}
+                    {r.status}
                   </td>
                   <td
                     className={`px-4 py-2 font-medium ${
-                      row.rfidStatus === "Bound"
+                      r.rfidStatus === "Bound"
                         ? "text-green-600"
                         : "text-gray-500"
                     }`}
                   >
-                    {row.rfidStatus}
+                    {r.rfidStatus}
                   </td>
                   <td className="px-4 py-2 font-mono text-gray-700">
-                    {row.rfidCode}
+                    {r.rfidCode}
                   </td>
-                  <td>{row.pensionReceived}</td>
-                  <td>{row.missed}</td>
-                  <td>{row.lastClaim}</td>
+                  <td>{r.pensionReceived}</td>
+                  <td>{r.missed}</td>
+                  <td>{r.lastClaim}</td>
                 </tr>
               ))}
             </tbody>
