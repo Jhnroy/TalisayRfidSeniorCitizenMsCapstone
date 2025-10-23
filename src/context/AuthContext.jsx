@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // ✅ Check sessionStorage para iwas flicker
+          //  Check sessionStorage para iwas flicker
           const cachedRole = sessionStorage.getItem("userRole");
 
           if (cachedRole) {
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
               role: cachedRole,
             });
           } else {
-            // ✅ Fetch role from DB kung wala sa session
+            //  Fetch role from DB kung wala sa session
             const roleRef = ref(rtdb, `users/${firebaseUser.uid}/role`);
             const snapshot = await get(roleRef);
 
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Logout function
+  //  Logout function
   const logout = async () => {
     await signOut(auth);
     setUser(null);
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// ✅ Custom hook
+//  Custom hook
 export const useAuth = () => useContext(AuthContext);
 
 export default AuthContext;

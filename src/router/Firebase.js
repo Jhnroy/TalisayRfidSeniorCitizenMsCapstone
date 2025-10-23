@@ -1,27 +1,28 @@
+// Firebase.js
 // Import Firebase SDKs
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getDatabase } from "firebase/database"; // ✅ RTDB
+import { getDatabase } from "firebase/database"; // ✅ Realtime Database
 
-// Firebase configuration (from your credentials)
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
-  authDomain: "rfidseniorcitizenms.firebaseapp.com",
-  databaseURL: "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "rfidseniorcitizenms",
-  storageBucket: "rfidseniorcitizenms.firebasestorage.app",
-  messagingSenderId: "412368953505",
-  appId: "1:412368953505:web:43c8b2f607e50b9fde10e0",
-  measurementId: "G-KGRDKXYP4S",
+  apiKey: "AIzaSyAO9TdAUkHNh7jk9U6NRKlCtMmM0pla-_0",
+  authDomain: "rfidbasedseniormscapstone.firebaseapp.com",
+  databaseURL: "https://rfidbasedseniormscapstone-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rfidbasedseniormscapstone",
+  storageBucket: "rfidbasedseniormscapstone.firebasestorage.app",
+  messagingSenderId: "231424248323",
+  appId: "1:231424248323:web:a609ea6237275d93eb9c36",
+  measurementId: "G-NCE2MRD0WL",
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase only if not already initialized
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firebase services
+// Export Firebase services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const rtdb = getDatabase(app); // ✅ Realtime Database
+export const rtdb = getDatabase(app);
 
 export default app;

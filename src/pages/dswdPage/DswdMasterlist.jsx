@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { rtdb } from "../../router/Firebase";
-import { ref, onValue, update, get } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 
 const barangays = [
   "Binanuun",
@@ -20,7 +20,7 @@ const barangays = [
   "Sto. Niño",
 ];
 
-// Format date safely
+// ✅ Format date safely
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
   try {
@@ -38,7 +38,7 @@ const formatDate = (dateStr) => {
   }
 };
 
-// Compute age
+// ✅ Compute age
 const getAge = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "N/A";
   const today = new Date();
@@ -47,6 +47,24 @@ const getAge = (dateStr) => {
   const m = today.getMonth() - birthDate.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
   return age;
+};
+
+// ✅ Format full name
+const formatFullName = (last, first, middle, ext) => {
+  const middleInitial = middle ? `${middle.charAt(0)}.` : "";
+  const suffix = ext ? ` ${ext}` : "";
+  return `${last}, ${first} ${middleInitial}${suffix}`.trim();
+};
+
+// ✅ Determine quarter from date
+const determineQuarter = (dateStr) => {
+  if (!dateStr || dateStr === "Never") return "N/A";
+  const month = new Date(dateStr).getMonth() + 1;
+  if (month >= 1 && month <= 3) return "1st Quarter";
+  if (month >= 4 && month <= 6) return "2nd Quarter";
+  if (month >= 7 && month <= 9) return "3rd Quarter";
+  if (month >= 10 && month <= 12) return "4th Quarter";
+  return "N/A";
 };
 
 const Masterlist = () => {
@@ -58,10 +76,10 @@ const Masterlist = () => {
   });
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
   const [barangayFilter, setBarangayFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [ageFilter, setAgeFilter] = useState("All");
   const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => {
@@ -87,29 +105,32 @@ const Masterlist = () => {
           Object.values(rfidData).find((r) => r.seniorId === value.seniorId) ||
           {};
 
+        const lastClaimDate = rfidInfo.lastClaimDate
+          ? formatDate(rfidInfo.lastClaimDate)
+          : "Never";
+        const quarter = determineQuarter(rfidInfo.lastClaimDate);
+
         return {
           id,
           seniorId: value.seniorId || "",
           surname: value.lastName || "",
           firstName: value.firstName || "",
           middleName: value.middleName || "",
-          extName: value.extName || "",
+          suffix: value.suffix || "",
           barangay: value.barangay || "-",
           birthday: value.dateOfBirth || "",
           birthdayFormatted: formatDate(value.dateOfBirth),
+          age: getAge(value.dateOfBirth),
           status: value.status || "Active",
           rfidStatus: rfidInfo.status || "Not Bound",
           rfidCode: rfidInfo.rfidCode || "-",
-          pensionReceived: rfidInfo.pensionReceived ? "Yes" : "No",
+          quarter,
           missed: rfidInfo.missedConsecutive ?? 0,
-          lastClaim: rfidInfo.lastClaimDate
-            ? formatDate(rfidInfo.lastClaimDate)
-            : "Never",
+          lastClaim: lastClaimDate,
           lastUpdated: value.lastUpdated || null,
         };
       });
 
-      // Create subsets
       const overall = seniorsArray;
       const pensioners = seniorsArray.filter(
         (row) => row.status === "Eligible"
@@ -120,7 +141,7 @@ const Masterlist = () => {
         if (!row.lastUpdated) return false;
         const updatedDate = new Date(row.lastUpdated);
         const diffDays = (now - updatedDate) / (1000 * 60 * 60 * 24);
-        return diffDays <= 7; // ✅ Updated within last 7 days
+        return diffDays <= 7;
       });
 
       setRecords({ overall, pensioners, recent });
@@ -144,7 +165,7 @@ const Masterlist = () => {
     };
   }, []);
 
-  // Filters
+  // ✅ Filtering logic
   useEffect(() => {
     if (loading) return;
     let sourceData = [];
@@ -156,7 +177,12 @@ const Masterlist = () => {
 
     if (search.trim() !== "")
       filtered = filtered.filter((row) =>
-        `${row.surname}, ${row.firstName} ${row.middleName} ${row.extName}`
+        formatFullName(
+          row.surname,
+          row.firstName,
+          row.middleName,
+          row.suffix
+        )
           .toLowerCase()
           .includes(search.toLowerCase())
       );
@@ -173,53 +199,35 @@ const Masterlist = () => {
           statusFilter.toLowerCase()
       );
 
+    if (ageFilter !== "All") {
+      filtered = filtered.filter((row) => {
+        const age = row.age;
+        if (age === "N/A") return false;
+
+        switch (ageFilter) {
+          case "60-69":
+            return age >= 60 && age <= 69;
+          case "70-79":
+            return age >= 70 && age <= 79;
+          case "80-89":
+            return age >= 80 && age <= 89;
+          case "90+":
+            return age >= 90;
+          default:
+            return true;
+        }
+      });
+    }
+
     setFilteredRecords(filtered);
-  }, [search, barangayFilter, statusFilter, activeTab, records, loading]);
+  }, [search, barangayFilter, statusFilter, ageFilter, activeTab, records, loading]);
 
   const resetFilters = () => {
     setSearch("");
     setBarangayFilter("All");
     setStatusFilter("All");
+    setAgeFilter("All");
     setActiveTab("overall");
-  };
-
-  // ✅ Validation with timestamp for recent tab
-  const handleValidation = async (status) => {
-    if (!selectedRecord) return;
-    try {
-      const agencies = ["AFP", "GSIS", "PVAO", "SSS"];
-      let hasExistingPension = false;
-
-      for (const agency of agencies) {
-        const agencyRef = ref(
-          rtdb,
-          `pensionAgencies/${agency}/${selectedRecord.seniorId}`
-        );
-        const snapshot = await get(agencyRef);
-        if (snapshot.exists()) {
-          hasExistingPension = true;
-          break;
-        }
-      }
-
-      if (status === "Eligible" && hasExistingPension) {
-        alert(
-          "❌ This senior already has an existing pension from another agency. Cannot mark as Eligible."
-        );
-        return;
-      }
-
-      const recordRef = ref(rtdb, `senior_citizens/${selectedRecord.id}`);
-      await update(recordRef, {
-        status,
-        lastUpdated: new Date().toISOString(), // ✅ add recent timestamp
-      });
-      alert(`✅ Record updated to ${status}`);
-      setSelectedRecord(null);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to update record.");
-    }
   };
 
   return (
@@ -260,6 +268,17 @@ const Masterlist = () => {
             <option value="Removed">Removed</option>
           </select>
         )}
+        <select
+          className="border px-3 py-2 rounded-md"
+          value={ageFilter}
+          onChange={(e) => setAgeFilter(e.target.value)}
+        >
+          <option value="All">All Ages</option>
+          <option value="60-69">60–69</option>
+          <option value="70-79">70–79</option>
+          <option value="80-89">80–89</option>
+          <option value="90+">90+</option>
+        </select>
         <button
           className="border border-gray-400 px-3 py-2 rounded-md"
           onClick={resetFilters}
@@ -302,7 +321,7 @@ const Masterlist = () => {
         </button>
       </div>
 
-      {/* Table */}
+      {/* ✅ Table */}
       <div className="overflow-x-auto shadow border border-gray-200 rounded-b-lg">
         {loading ? (
           <p className="p-4 text-center text-gray-500">Loading records...</p>
@@ -312,15 +331,17 @@ const Masterlist = () => {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100 text-left">
               <tr>
+                <th className="px-4 py-2">ID Number</th>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Birthday</th>
+                <th className="px-4 py-2">Age</th>
                 <th className="px-4 py-2">Barangay</th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">RFID Status</th>
                 <th className="px-4 py-2">RFID Code</th>
-                <th className="px-4 py-2">Pension Received</th>
-                <th className="px-4 py-2">Missed Consecutive</th>
-                <th className="px-4 py-2">Last Claim Date</th>
+                <th className="px-4 py-2 text-center">Quarter Claim</th>
+                <th className="px-4 py-2 text-center">Missed</th>
+                <th className="px-4 py-2 text-center">Last Claim</th>
                 {activeTab === "recent" && (
                   <th className="px-4 py-2">Last Updated</th>
                 )}
@@ -333,11 +354,19 @@ const Masterlist = () => {
                   className="border-t hover:bg-gray-50 cursor-pointer"
                   onClick={() => setSelectedRecord(row)}
                 >
-                  <td className="px-4 py-2">
-                    {row.surname}, {row.firstName} {row.middleName || ""}{" "}
-                    {row.extName || ""}
+                  <td className="px-4 py-2 font-mono text-gray-700">
+                    {row.seniorId}
+                  </td>
+                  <td className="px-4 py-2 font-medium text-gray-800">
+                    {formatFullName(
+                      row.surname,
+                      row.firstName,
+                      row.middleName,
+                      row.suffix
+                    )}
                   </td>
                   <td className="px-4 py-2">{row.birthdayFormatted}</td>
+                  <td className="px-4 py-2 text-center">{row.age}</td>
                   <td className="px-4 py-2">{row.barangay}</td>
                   <td
                     className={`px-4 py-2 font-medium ${
@@ -361,10 +390,14 @@ const Masterlist = () => {
                   >
                     {row.rfidStatus}
                   </td>
-                  <td className="px-4 py-2 font-mono">{row.rfidCode}</td>
-                  <td>{row.pensionReceived}</td>
-                  <td>{row.missed}</td>
-                  <td>{row.lastClaim}</td>
+                  <td className="px-4 py-2 font-mono text-center">
+                    {row.rfidCode}
+                  </td>
+                  <td className="px-4 py-2 text-center font-semibold text-blue-600">
+                    {row.quarter}
+                  </td>
+                  <td className="px-4 py-2 text-center">{row.missed}</td>
+                  <td className="px-4 py-2 text-center">{row.lastClaim}</td>
                   {activeTab === "recent" && (
                     <td>{row.lastUpdated ? formatDate(row.lastUpdated) : "-"}</td>
                   )}

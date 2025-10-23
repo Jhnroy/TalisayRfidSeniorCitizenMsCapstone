@@ -3,13 +3,13 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
-  authDomain: "rfidseniorcitizenms.firebaseapp.com",
-  databaseURL: "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "rfidseniorcitizenms",
-  storageBucket: "rfidseniorcitizenms.firebasestorage.app",
-  messagingSenderId: "412368953505",
-  appId: "1:412368953505:web:43c8b2f607e50b9fde10e0",
+  apiKey: "AIzaSyAO9TdAUkHNh7jk9U6NRKlCtMmM0pla-_0",
+  authDomain: "rfidbasedseniormscapstone.firebaseapp.com",
+  databaseURL: "https://rfidbasedseniormscapstone-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rfidbasedseniormscapstone",
+  storageBucket: "rfidbasedseniormscapstone.firebasestorage.app",
+  messagingSenderId: "231424248323",
+  appId: "1:231424248323:web:a609ea6237275d93eb9c36",
 };
 
 // ✅ check muna kung may existing app bago gumawa ng bago

@@ -14,15 +14,15 @@ import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 // ✅ Firebase Config
 const firebaseConfig = {
-  apiKey: "AIzaSyChxzDRb2g3V2c6IeP8WF3baunT-mnnR68",
-  authDomain: "rfidseniorcitizenms.firebaseapp.com",
+  apiKey: "AIzaSyAO9TdAUkHNh7jk9U6NRKlCtMmM0pla-_0",
+  authDomain: "rfidbasedseniormscapstone.firebaseapp.com",
   databaseURL:
-    "https://rfidseniorcitizenms-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "rfidseniorcitizenms",
-  storageBucket: "rfidseniorcitizenms.firebasestorage.app",
-  messagingSenderId: "412368953505",
-  appId: "1:412368953505:web:43c8b2f607e50b9fde10e0",
-  measurementId: "G-KGRDKXYP4S",
+    "https://rfidbasedseniormscapstone-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rfidbasedseniormscapstone",
+  storageBucket: "rfidbasedseniormscapstone.firebasestorage.app",
+  messagingSenderId: "231424248323",
+  appId: "1:231424248323:web:a609ea6237275d93eb9c36",
+  measurementId: "G-NCE2MRD0WL",
 };
 
 const app = initializeApp(firebaseConfig);

@@ -24,6 +24,7 @@ const AdminSidebar = () => {
     { label: "Masterlist", icon: <FaFileAlt />, path: "/admin/admin-masterlist" },
     // { label: "Pension", icon: <FaMoneyCheckAlt />, path: "/admin/pension" },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/admin/calendar" },
+    {label: "RFID Claiming Interface", icon: <FaFileAlt />, path: "/admin/rfid-claiming-interface", exact: true},
     
     
     // { label: "Archive Records", icon: <FaArchive />, path: "/admin/archive" },

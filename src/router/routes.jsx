@@ -24,6 +24,7 @@ import Archive from "../pages/admin/Archive";
 import Calendar from "../pages/admin/Calendar";
 import Settings from "../pages/admin/Settings";
 import AdminMasterlist from "../pages/admin/AdminMasterlist";
+import RfidClaimingInterface from "../pages/admin/RfidClaimingInterface";
 
 // Super Admin (MSWD)
 import SuperAdminDashboard from "../pages/superAdmin/SuperAdminDashboard";
@@ -77,6 +78,7 @@ const routes = createBrowserRouter([
       { path: "archive", element: <Archive /> },
       { path: "calendar", element: <Calendar /> },
       { path: "settings", element: <Settings /> },
+      { path: "rfid-claiming-interface", element: <RfidClaimingInterface /> },
     ],
   },
 

@@ -244,7 +244,7 @@ const RfidBinding = () => {
               }`}
             >
               {isBinding ? (
-                <span className="animate-pulse">⏳ Binding...</span>
+                <span className="animate-pulse"> Binding...</span>
               ) : (
                 <>
                   <FaLink className="mr-2" /> Bind RFID
@@ -256,7 +256,7 @@ const RfidBinding = () => {
           {bindMessage && (
             <p
               className={`mt-3 text-sm ${
-                bindMessage.includes("✅")
+                bindMessage.includes("")
                   ? "text-green-600"
                   : "text-red-600 font-semibold"
               }`}
