@@ -171,7 +171,7 @@ export default function RfidClaimingInterface() {
               <p><strong>Gender:</strong> {beneficiary.gender}</p>
               <p><strong>Contact:</strong> {beneficiary.contactNumber}</p>
               <p>
-                <strong>Barangay Certificate:</strong>{" "}
+                <strong>Valid I.D:</strong>{" "}
                 {beneficiary.barangayCertificate ? (
                   <a
                     href={beneficiary.barangayCertificate}
