@@ -104,15 +104,16 @@ const Masterlist = () => {
       const rfidData = rfidSnap.exists() ? rfidSnap.val() : {};
 
       const seniorsArray = Object.entries(seniorsData).map(([id, value]) => {
-        const rfidInfo =
-          Object.values(rfidData).find((r) => r.seniorId === value.seniorId) ||
-          {};
+        // Find if this senior is bound to any RFID
+        const rfidInfo = Object.values(rfidData).find(
+          (r) => r.seniorId === value.seniorId
+        );
 
         const age = computeAge(value.dateOfBirth);
-        const lastClaimFormatted = rfidInfo.lastClaimDate
+        const lastClaimFormatted = rfidInfo?.lastClaimDate
           ? formatDate(rfidInfo.lastClaimDate)
           : "Never";
-        const quarter = determineQuarter(rfidInfo.lastClaimDate);
+        const quarter = determineQuarter(rfidInfo?.lastClaimDate);
 
         return {
           id,
@@ -126,11 +127,11 @@ const Masterlist = () => {
           age,
           status: value.status || "Pending",
           validated: value.validated || false,
-          rfidStatus: rfidInfo.status || "Not Bound",
-          rfidCode: rfidInfo.rfidCode || "-",
-          missed: rfidInfo.missedConsecutive ?? 0,
+          rfidStatus: rfidInfo ? "Bound" : "Unbound", // ✅ FIXED HERE
+          rfidCode: rfidInfo?.rfidCode || "-",
+          missed: rfidInfo?.missedConsecutive ?? 0,
           lastClaim: lastClaimFormatted,
-          quarter: quarter,
+          quarter,
         };
       });
 
@@ -220,7 +221,7 @@ const Masterlist = () => {
     setActiveTab("overall");
   };
 
-  // ✅ Generate Excel Report (with Quarter)
+  // ✅ Generate Excel Report (Bound Only)
   const generateReport = async () => {
     const eligibleBound = records.overall.filter(
       (r) => r.status === "Eligible" && r.rfidStatus === "Bound"

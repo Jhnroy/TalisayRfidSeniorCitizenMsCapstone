@@ -33,6 +33,7 @@ import Validation from "../pages/superAdmin/Validation";
 import RfidBinding from "../pages/superAdmin/RfidBinding";
 import Masterlist from "../pages/superAdmin/Masterlist";
 import SuperAdminCalendar from "../pages/superAdmin/SuperAdminCalendar";
+import NewIDGenerator from "../pages/superAdmin/IDGenerator";
 
 // DSWD
 import DswdMasterlist from "../pages/dswdPage/DswdMasterlist";
@@ -79,6 +80,8 @@ const routes = createBrowserRouter([
       { path: "calendar", element: <Calendar /> },
       { path: "settings", element: <Settings /> },
       { path: "rfid-claiming-interface", element: <RfidClaimingInterface /> },
+      
+
     ],
   },
 
@@ -99,6 +102,7 @@ const routes = createBrowserRouter([
       { path: "calendar", element: <SuperAdminCalendar /> },
       { path: "rfid-binding", element: <RfidBinding /> },
       { path: "masterlist", element: <Masterlist /> },
+      { path: "id-generator", element: <NewIDGenerator /> },
     ],
   },
 
