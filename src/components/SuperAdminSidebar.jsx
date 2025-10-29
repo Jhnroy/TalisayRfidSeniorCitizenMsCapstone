@@ -29,7 +29,7 @@ const SuperAdminSidebar = () => {
       // ],
     },
     { label: "Calendar", icon: <FaCalendarAlt />, path: "/super-admin/calendar" },
-    {label: "RFID Binding", icon: <FaFileAlt />, path: "/super-admin/rfid-binding", exact: true},
+    // {label: "RFID Binding", icon: <FaFileAlt />, path: "/super-admin/rfid-binding", exact: true},
     { label: "Masterlist", icon: <FaFileAlt />, path: "/super-admin/masterlist" },
     {label: "Generate I.D Card", icon: <FaFileAlt />, path: "/super-admin/id-generator"},
     // { label: "Admin Management", icon: <FaUsersCog />, path: "/super-admin/admin-management" },
