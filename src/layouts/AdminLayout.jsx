@@ -8,18 +8,24 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* Sidebar */}
       <AdminSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-      
 
       {/* Main content area */}
-      <div className={`flex flex-col flex-1 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0 md:ml-64"}`}>
+      <div
+        className={`flex flex-col flex-1 transition-all duration-300 ${
+          sidebarOpen ? "md:ml-64" : "ml-0"
+        }`}
+      >
+        {/* Header */}
         <AdminHeader setSidebarOpen={setSidebarOpen} />
-        
 
-        <main className="p-4 mt-16 overflow-y-auto h-full">
-          <Outlet />
+        {/* Main Content */}
+        <main className="flex-1 p-6 mt-16 overflow-y-auto">
+          <div className="max-w-7xl mx-auto w-full">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

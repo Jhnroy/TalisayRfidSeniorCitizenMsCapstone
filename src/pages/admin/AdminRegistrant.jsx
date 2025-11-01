@@ -136,23 +136,38 @@ const AdminRegistrant = () => {
 
   /* Handle input changes including file uploads */
   const handleChange = async (e) => {
-    const { name, value, type, checked, files } = e.target;
-    if (type === "file" && files[0]) {
-      try {
-        const base64 = await convertToBase64(files[0]);
-        setFormData((prev) => ({ ...prev, [name]: base64 }));
-        if (name === "profilePicture") setProfilePreview(base64);
-      } catch (err) {
-        console.error("File read error:", err);
-      }
-      return;
+  const { name, value, type, checked, files } = e.target;
+
+  // File uploads
+  if (type === "file" && files[0]) {
+    try {
+      const base64 = await convertToBase64(files[0]);
+      setFormData((prev) => ({ ...prev, [name]: base64 }));
+      if (name === "profilePicture") setProfilePreview(base64);
+    } catch (err) {
+      console.error("File read error:", err);
     }
-    if (type === "checkbox") {
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-      return;
-    }
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+    return;
+  }
+
+  // Checkbox
+  if (type === "checkbox") {
+    setFormData((prev) => ({ ...prev, [name]: checked }));
+    return;
+  }
+
+  // 💰 Format amount fields with comma separators
+  if (name === "monthlyPension" || name === "monthlyIncome") {
+    const numericValue = value.replace(/[^\d]/g, ""); // remove non-numeric chars
+    const formatted = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ","); // add commas
+    setFormData((prev) => ({ ...prev, [name]: formatted }));
+    return;
+  }
+
+  // Default
+  setFormData((prev) => ({ ...prev, [name]: value }));
+};
+
 
   /* Number-only input helper */
   const handleNumberInput = (e) => {
@@ -489,56 +504,97 @@ const AdminRegistrant = () => {
 
           {/* Pension & Occupation */}
           <div className="bg-white shadow-sm border border-gray-200 p-6 mt-6">
-              <h2 className="text-lg font-semibold text-gray-700 mb-4">
-                Pension and Occupation Details <span className="text-gray-500 text-sm">(if applicable)</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-gray-600 text-sm mb-1">Monthly Pension Amount (₱)</label>
-                  <input
-                    type="number"
-                    name="monthlyPension"
-                    placeholder="0.00"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    value={formData.monthlyPension}
-                    onChange={handleNumberInput} // numeric-only handler
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-600 text-sm mb-1">Pension Source (SSS, GSIS, ATBP)</label>
-                  <input
-                    type="text"
-                    name="pensionSource"
-                    placeholder="Enter pension source"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    value={formData.pensionSource}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-600 text-sm mb-1">Monthly Income (₱)</label>
-                  <input
-                    type="number"
-                    name="monthlyIncome"
-                    placeholder="0.00"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    value={formData.monthlyIncome}
-                    onChange={handleNumberInput} // numeric-only
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-600 text-sm mb-1">Current Occupation (if applicable)</label>
-                  <input
-                    type="text"
-                    name="occupation"
-                    placeholder="Enter current occupation"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                    value={formData.occupation}
-                    onChange={handleChange}
-                  />
-                </div>
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">
+              Pension and Occupation Details{" "}
+              <span className="text-gray-500 text-sm">(if applicable)</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Monthly Pension */}
+              <div>
+                <label className="block text-gray-600 text-sm mb-1">
+                  Monthly Pension Amount (₱)
+                </label>
+                <input
+                  type="text"
+                  name="monthlyPension"
+                  placeholder="0.00"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  value={
+                    formData.monthlyPension
+                      ? Number(formData.monthlyPension).toLocaleString("en-PH")
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/,/g, "");
+                    if (!isNaN(rawValue)) {
+                      setFormData({
+                        ...formData,
+                        monthlyPension: rawValue,
+                      });
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Pension Source */}
+              <div>
+                <label className="block text-gray-600 text-sm mb-1">
+                  Pension Source (SSS, GSIS, ATBP)
+                </label>
+                <input
+                  type="text"
+                  name="pensionSource"
+                  placeholder="Enter pension source"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  value={formData.pensionSource}
+                  onChange={handleChange}
+                />
+              </div>
+
+              {/* Monthly Income */}
+              <div>
+                <label className="block text-gray-600 text-sm mb-1">
+                  Monthly Income (₱)
+                </label>
+                <input
+                  type="text"
+                  name="monthlyIncome"
+                  placeholder="0.00"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  value={
+                    formData.monthlyIncome
+                      ? Number(formData.monthlyIncome).toLocaleString("en-PH")
+                      : ""
+                  }
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/,/g, "");
+                    if (!isNaN(rawValue)) {
+                      setFormData({
+                        ...formData,
+                        monthlyIncome: rawValue,
+                      });
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Occupation */}
+              <div>
+                <label className="block text-gray-600 text-sm mb-1">
+                  Current Occupation (if applicable)
+                </label>
+                <input
+                  type="text"
+                  name="occupation"
+                  placeholder="Enter current occupation"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  value={formData.occupation}
+                  onChange={handleChange}
+                />
               </div>
             </div>
+          </div>
+
 
           {/* Required Documents */}
           <div className="p-6 border-b border-gray-200">

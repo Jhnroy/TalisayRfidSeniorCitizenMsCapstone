@@ -6,6 +6,7 @@ import {
   FaCheckCircle,
   FaTimesCircle,
   FaUserCircle,
+  FaTimes,
 } from "react-icons/fa";
 
 const barangays = [
@@ -27,6 +28,7 @@ const barangays = [
   "Sto. Niño",
 ];
 
+// Utility: Format Dates
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
   try {
@@ -44,6 +46,7 @@ const formatDate = (dateStr) => {
   }
 };
 
+// Utility: Calculate Age
 const getAge = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "N/A";
   const today = new Date();
@@ -62,8 +65,15 @@ const DswdValidation = () => {
   const [barangayFilter, setBarangayFilter] = useState("All Barangays");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [documentModal, setDocumentModal] = useState({
+    show: false,
+    url: "",
+    title: "",
+  });
 
+  // 🧩 Fetch and Merge Data from Firebase
   useEffect(() => {
+    console.log("🔍 Initializing Firebase Realtime Database fetch...");
     const seniorsRef = ref(rtdb, "senior_citizens");
     const rfidRef = ref(rtdb, "rfidBindings");
 
@@ -101,12 +111,13 @@ const DswdValidation = () => {
           });
         }
       } catch (error) {
-        console.error("Error fetching pensions:", error);
+        console.error("❌ Error fetching pensions:", error);
       }
       return pensions;
     };
 
     const mergeAndSet = async () => {
+      console.log("⚙️ Merging data...");
       const seniorsArray = await Promise.all(
         Object.entries(seniorsData).map(async ([id, value]) => {
           const rfidInfo =
@@ -119,7 +130,6 @@ const DswdValidation = () => {
             id,
             seniorId: value.seniorId || "",
             name: `${value.lastName || ""}, ${value.firstName || ""} ${value.middleName || ""}${suffix}`.trim(),
-            suffix: value.suffix || "",
             barangay: value.barangay || "-",
             birthday: value.dateOfBirth || "",
             age: getAge(value.dateOfBirth),
@@ -137,6 +147,7 @@ const DswdValidation = () => {
         })
       );
 
+      console.log("✅ Seniors Loaded:", seniorsArray.length);
       setRecords(seniorsArray);
       setFilteredData(seniorsArray);
       setLoading(false);
@@ -144,22 +155,27 @@ const DswdValidation = () => {
 
     const unsubSeniors = onValue(seniorsRef, (snap) => {
       seniorsData = snap.exists() ? snap.val() : {};
+      console.log("📥 Seniors Data Fetched:", Object.keys(seniorsData).length);
       mergeAndSet();
     });
 
     const unsubRfid = onValue(rfidRef, (snap) => {
       rfidData = snap.exists() ? snap.val() : {};
+      console.log("📡 RFID Data Fetched:", Object.keys(rfidData).length);
       mergeAndSet();
     });
 
     return () => {
+      console.log("🧹 Cleaning up listeners...");
       unsubSeniors();
       unsubRfid();
     };
   }, []);
 
+  // 🧠 Filtering Logic
   useEffect(() => {
     if (loading) return;
+    console.log("🔍 Applying filters...");
     let data = [...records];
 
     if (search.trim() !== "")
@@ -175,15 +191,19 @@ const DswdValidation = () => {
     if (statusFilter !== "All Statuses")
       data = data.filter((row) => row.validationStatus === statusFilter);
 
+    console.log("✅ Filtered Data:", data.length);
     setFilteredData(data);
   }, [search, barangayFilter, statusFilter, records, loading]);
 
+  // Reset Filters
   const resetFilters = () => {
+    console.log("🔄 Resetting filters...");
     setSearch("");
     setBarangayFilter("All Barangays");
     setStatusFilter("All Statuses");
   };
 
+  // ✅ Validation Action
   const handleValidation = async (status) => {
     if (!selectedRecord) return;
 
@@ -193,6 +213,7 @@ const DswdValidation = () => {
     }
 
     try {
+      console.log(`📝 Updating status to ${status} for`, selectedRecord.seniorId);
       const recordRef = ref(rtdb, `senior_citizens/${selectedRecord.id}`);
       await update(recordRef, {
         status,
@@ -210,11 +231,23 @@ const DswdValidation = () => {
       alert(`✅ Successfully marked as ${status}.`);
       setSelectedRecord(null);
     } catch (error) {
-      console.error(error);
-      alert("❌ Failed to update record.");
+      console.error("❌ Failed to update record:", error);
+      alert("Failed to update record.");
     }
   };
 
+  // 🔍 Document Modal Controls
+  const openDocumentModal = (url, title) => {
+    console.log("📄 Opening Document:", title, url);
+    setDocumentModal({ show: true, url, title });
+  };
+
+  const closeDocumentModal = () => {
+    console.log("❌ Closing Document Modal");
+    setDocumentModal({ show: false, url: "", title: "" });
+  };
+
+  // 🧾 Render UI
   return (
     <div className="p-4 w-full overflow-x-auto">
       <h2 className="text-2xl font-bold mb-1">Validation</h2>
@@ -262,7 +295,11 @@ const DswdValidation = () => {
       {/* Table */}
       <div className="overflow-x-auto">
         {loading ? (
-          <p className="p-4 text-center text-gray-500">Loading records...</p>
+          <p className="p-4 text-center text-gray-500 animate-pulse">
+            ⏳ Loading records from Firebase...
+          </p>
+        ) : filteredData.length === 0 ? (
+          <p className="p-4 text-center text-gray-500">No matching records found.</p>
         ) : (
           <table className="min-w-full border border-gray-200 rounded-lg">
             <thead className="bg-gray-100">
@@ -273,7 +310,7 @@ const DswdValidation = () => {
                 <th className="px-4 py-2 border-b">Age</th>
                 <th className="px-4 py-2 border-b">Eligibility</th>
                 <th className="px-4 py-2 border-b">Registration Date</th>
-                <th className="px-4 py-2 border-b">RFID Binded</th>
+                <th className="px-4 py-2 border-b">RFID</th>
                 <th className="px-4 py-2 border-b">Validation Status</th>
               </tr>
             </thead>
@@ -283,17 +320,11 @@ const DswdValidation = () => {
                   key={item.id || idx}
                   className={`cursor-pointer ${
                     idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                  } hover:bg-gray-100`}
+                  } hover:bg-blue-50 transition`}
                   onClick={() => setSelectedRecord(item)}
                 >
                   <td className="px-4 py-2">{item.seniorId}</td>
-                  <td className="px-4 py-2 font-medium">
-                    {item.lastName
-                      ? `${item.lastName}, ${item.firstName} ${item.middleName || ""}${
-                          item.suffix ? " " + item.suffix : ""
-                        }`
-                      : item.name}
-                  </td>
+                  <td className="px-4 py-2 font-medium">{item.name}</td>
                   <td className="px-4 py-2">{item.barangay}</td>
                   <td className="px-4 py-2">{item.age}</td>
                   <td className="px-4 py-2">{item.eligibility}</td>
@@ -327,10 +358,17 @@ const DswdValidation = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Validation Modal */}
       {selectedRecord && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-10">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-20">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setSelectedRecord(null)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <FaTimes size={20} />
+            </button>
+
             <div className="flex flex-col items-center mb-4">
               {selectedRecord.profilePicture ? (
                 <img
@@ -343,25 +381,19 @@ const DswdValidation = () => {
               )}
             </div>
 
-            <h2 className="text-lg font-bold mb-4 text-center">Validate Senior</h2>
+            <h2 className="text-lg font-bold mb-4 text-center">
+              Validate Senior
+            </h2>
 
-            <p>
-              <strong>ID Number:</strong> {selectedRecord.seniorId}
-            </p>
-            <p>
-              <strong>Name:</strong> {selectedRecord.name}
-            </p>
-            <p>
-              <strong>Barangay:</strong> {selectedRecord.barangay}
-            </p>
-            <p>
-              <strong>Age:</strong> {selectedRecord.age}
-            </p>
+            <p><strong>ID:</strong> {selectedRecord.seniorId}</p>
+            <p><strong>Name:</strong> {selectedRecord.name}</p>
+            <p><strong>Barangay:</strong> {selectedRecord.barangay}</p>
+            <p><strong>Age:</strong> {selectedRecord.age}</p>
 
-            {/* Pension Info */}
+            {/* Pension Section */}
             {selectedRecord.hasPension && (
-              <div className="text-red-500 font-semibold mt-3 space-y-2">
-                <p>This senior already has an existing pension:</p>
+              <div className="text-red-600 mt-3 space-y-2 font-semibold">
+                <p>This senior already has a pension:</p>
                 {selectedRecord.pensions.map((p, i) => (
                   <div key={i} className="pl-2">
                     <p>• Pension Source: {p.pensionSource}</p>
@@ -376,69 +408,60 @@ const DswdValidation = () => {
             {/* Certificates */}
             <div className="mt-5 space-y-3 border-t border-gray-200 pt-3">
               <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                <FaFileAlt className="text-blue-500" />
-                Submitted Credentials
+                <FaFileAlt className="text-blue-500" /> Submitted Credentials
               </h3>
 
               {/* Birth Certificate */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FaFileAlt className="text-blue-500 text-lg" />
-                  <span className="font-medium">Birth Certificate:</span>
-                </div>
+                <span className="font-medium flex items-center gap-2">
+                  Birth Certificate:
+                  {selectedRecord.birthCertificate ? (
+                    <FaCheckCircle className="text-green-500" />
+                  ) : (
+                    <FaTimesCircle className="text-red-500" />
+                  )}
+                </span>
                 {selectedRecord.birthCertificate ? (
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={selectedRecord.birthCertificate}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 underline font-semibold"
-                    >
-                      View
-                    </a>
-                    <FaCheckCircle className="text-green-500 text-lg" />
-                  </div>
+                  <button
+                    onClick={() =>
+                      openDocumentModal(selectedRecord.birthCertificate, "Birth Certificate")
+                    }
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    View
+                  </button>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500 text-sm font-semibold">
-                      Not Uploaded
-                    </span>
-                    <FaTimesCircle className="text-red-500 text-lg" />
-                  </div>
+                  <span className="text-red-500 text-sm">Not Uploaded</span>
                 )}
               </div>
 
-              {/* Barangay Certificate */}
+              {/* Valid ID */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FaFileAlt className="text-blue-500 text-lg" />
-                  <span className="font-medium">Valid ID:</span>
-                </div>
+                <span className="font-medium flex items-center gap-2">
+                  Valid ID:
+                  {selectedRecord.barangayCertificate ? (
+                    <FaCheckCircle className="text-green-500" />
+                  ) : (
+                    <FaTimesCircle className="text-red-500" />
+                  )}
+                </span>
                 {selectedRecord.barangayCertificate ? (
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={selectedRecord.barangayCertificate}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 underline font-semibold"
-                    >
-                      View
-                    </a>
-                    <FaCheckCircle className="text-green-500 text-lg" />
-                  </div>
+                  <button
+                    onClick={() =>
+                      openDocumentModal(selectedRecord.barangayCertificate, "Valid ID")
+                    }
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    View
+                  </button>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500 text-sm font-semibold">
-                      Not Uploaded
-                    </span>
-                    <FaTimesCircle className="text-red-500 text-lg" />
-                  </div>
+                  <span className="text-red-500 text-sm">Not Uploaded</span>
                 )}
               </div>
             </div>
 
-            {/* Buttons */}
-            <div className="flex flex-wrap gap-2 mt-6">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 mt-6 justify-center">
               <button
                 onClick={() => handleValidation("Eligible")}
                 disabled={selectedRecord.hasPension}
@@ -456,13 +479,35 @@ const DswdValidation = () => {
               >
                 Mark Active
               </button>
-              <button
-                onClick={() => setSelectedRecord(null)}
-                className="ml-auto bg-gray-300 hover:bg-gray-400 px-3 py-2 rounded"
-              >
-                Close
-              </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Modal */}
+      {documentModal.show && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-30">
+          <div className="bg-white p-4 rounded-lg shadow-lg w-[90%] md:w-[70%] lg:w-[50%] max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={closeDocumentModal}
+              className="absolute top-3 right-3 text-gray-600 hover:text-black"
+            >
+              <FaTimes size={22} />
+            </button>
+            <h2 className="text-lg font-semibold mb-3">{documentModal.title}</h2>
+            {documentModal.url.endsWith(".pdf") ? (
+              <iframe
+                src={documentModal.url}
+                title="Document Viewer"
+                className="w-full h-[70vh] border"
+              />
+            ) : (
+              <img
+                src={documentModal.url}
+                alt="Document"
+                className="w-full h-auto rounded shadow-md object-contain"
+              />
+            )}
           </div>
         </div>
       )}

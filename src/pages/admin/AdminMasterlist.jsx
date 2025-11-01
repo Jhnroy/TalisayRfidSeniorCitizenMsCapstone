@@ -3,9 +3,8 @@ import { rtdb } from "../../router/Firebase";
 import { ref, onValue } from "firebase/database";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import dswdlogo from "../../assets/dswd-logo.png"; // ✅ logo import
+import dswdlogo from "../../assets/dswd-logo.png";
 
-// Barangay List
 const barangays = [
   "Binanuun",
   "Caawigan",
@@ -24,25 +23,19 @@ const barangays = [
   "Sto. Niño",
 ];
 
-// ✅ Format date
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
-  try {
-    const parsed = new Date(dateStr);
-    if (!isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-      });
-    }
-    return dateStr;
-  } catch {
-    return dateStr;
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+    });
   }
+  return dateStr;
 };
 
-// ✅ Compute age
 const computeAge = (birthdate) => {
   if (!birthdate || birthdate === "Never") return "-";
   const birth = new Date(birthdate);
@@ -56,7 +49,6 @@ const computeAge = (birthdate) => {
   return age;
 };
 
-// ✅ Determine quarter based on last claim month
 const determineQuarter = (lastClaimDate) => {
   if (!lastClaimDate || lastClaimDate === "Never") return "No Claim Yet";
   const date = new Date(lastClaimDate);
@@ -78,17 +70,17 @@ const Masterlist = () => {
   });
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
   const [barangayFilter, setBarangayFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [ageFilter, setAgeFilter] = useState("All");
+  const [sortOrder, setSortOrder] = useState("asc");
+  const [quarterFilter, setQuarterFilter] = useState("All");
 
-  // ✅ Fetch data from Firebase
+  // Fetch data
   useEffect(() => {
     const seniorsRef = ref(rtdb, "senior_citizens");
     const rfidRef = ref(rtdb, "rfidBindings");
-
     let seniorsSnapData = null;
     let rfidSnapData = null;
 
@@ -99,22 +91,18 @@ const Masterlist = () => {
         setLoading(false);
         return;
       }
-
       const seniorsData = seniorsSnap.val();
       const rfidData = rfidSnap.exists() ? rfidSnap.val() : {};
 
       const seniorsArray = Object.entries(seniorsData).map(([id, value]) => {
-        // Find if this senior is bound to any RFID
         const rfidInfo = Object.values(rfidData).find(
           (r) => r.seniorId === value.seniorId
         );
-
         const age = computeAge(value.dateOfBirth);
         const lastClaimFormatted = rfidInfo?.lastClaimDate
           ? formatDate(rfidInfo.lastClaimDate)
           : "Never";
         const quarter = determineQuarter(rfidInfo?.lastClaimDate);
-
         return {
           id,
           seniorId: value.seniorId || "-",
@@ -127,7 +115,7 @@ const Masterlist = () => {
           age,
           status: value.status || "Pending",
           validated: value.validated || false,
-          rfidStatus: rfidInfo ? "Bound" : "Unbound", // ✅ FIXED HERE
+          rfidStatus: rfidInfo ? "Bound" : "Unbound",
           rfidCode: rfidInfo?.rfidCode || "-",
           missed: rfidInfo?.missedConsecutive ?? 0,
           lastClaim: lastClaimFormatted,
@@ -149,55 +137,45 @@ const Masterlist = () => {
 
     const unsubSeniors = onValue(seniorsRef, (snap) => {
       seniorsSnapData = snap;
-      if (seniorsSnapData && rfidSnapData)
-        handleData(seniorsSnapData, rfidSnapData);
+      if (rfidSnapData) handleData(seniorsSnapData, rfidSnapData);
     });
-
     const unsubRfid = onValue(rfidRef, (snap) => {
       rfidSnapData = snap;
-      if (seniorsSnapData && rfidSnapData)
-        handleData(seniorsSnapData, rfidSnapData);
+      if (seniorsSnapData) handleData(seniorsSnapData, rfidSnapData);
     });
-
     return () => {
       unsubSeniors();
       unsubRfid();
     };
   }, []);
 
-  // ✅ Apply filters
+  // Filtering
   useEffect(() => {
     if (loading) return;
-
-    let data;
-    if (activeTab === "overall") data = records.overall;
-    else if (activeTab === "pensioners") data = records.pensioners;
-    else if (activeTab === "pending") data = records.pending;
-    else data = records.members;
-
+    let data =
+      activeTab === "overall"
+        ? records.overall
+        : activeTab === "pensioners"
+        ? records.pensioners
+        : activeTab === "pending"
+        ? records.pending
+        : records.members;
     let filtered = [...data];
-
     if (search.trim()) {
-      filtered = filtered.filter(
-        (r) =>
-          `${r.seniorId} ${r.surname}, ${r.firstName} ${r.middleName} ${r.extName}`
-            .toLowerCase()
-            .includes(search.toLowerCase())
+      filtered = filtered.filter((r) =>
+        `${r.seniorId} ${r.surname}, ${r.firstName} ${r.middleName} ${r.extName}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
       );
     }
-
-    if (barangayFilter !== "All") {
+    if (barangayFilter !== "All")
       filtered = filtered.filter(
         (r) => r.barangay?.toLowerCase() === barangayFilter.toLowerCase()
       );
-    }
-
-    if (statusFilter !== "All" && activeTab === "overall") {
+    if (statusFilter !== "All" && activeTab === "overall")
       filtered = filtered.filter(
         (r) => (r.status || "Active").toLowerCase() === statusFilter.toLowerCase()
       );
-    }
-
     if (ageFilter !== "All") {
       filtered = filtered.filter((r) => {
         if (r.age === "-" || isNaN(r.age)) return false;
@@ -209,9 +187,24 @@ const Masterlist = () => {
         return true;
       });
     }
-
+    filtered.sort((a, b) => {
+      const nameA = `${a.surname} ${a.firstName}`.toLowerCase();
+      const nameB = `${b.surname} ${b.firstName}`.toLowerCase();
+      return sortOrder === "asc"
+        ? nameA.localeCompare(nameB)
+        : nameB.localeCompare(nameA);
+    });
     setFilteredRecords(filtered);
-  }, [search, barangayFilter, statusFilter, ageFilter, activeTab, records, loading]);
+  }, [
+    search,
+    barangayFilter,
+    statusFilter,
+    ageFilter,
+    activeTab,
+    records,
+    sortOrder,
+    loading,
+  ]);
 
   const resetFilters = () => {
     setSearch("");
@@ -219,21 +212,34 @@ const Masterlist = () => {
     setStatusFilter("All");
     setAgeFilter("All");
     setActiveTab("overall");
+    setSortOrder("asc");
   };
+  const toggleSortOrder = () =>
+    setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  // ✅ Generate Excel Report (Bound Only)
+  // ✅ Excel Report
   const generateReport = async () => {
-    const eligibleBound = records.overall.filter(
+    let eligibleBound = records.overall.filter(
       (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
     );
 
+    if (quarterFilter !== "All") {
+      eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
+    }
+
     if (eligibleBound.length === 0) {
-      alert("No eligible and bound records found.");
+      alert(
+        quarterFilter === "All"
+          ? "No eligible and bound records found."
+          : `No records found for ${quarterFilter}.`
+      );
       return;
     }
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Quarterly Pensioners Report");
+    const worksheet = workbook.addWorksheet(
+      `${quarterFilter === "All" ? "All Quarters" : quarterFilter} Pensioners`
+    );
 
     worksheet.columns = Array(11)
       .fill()
@@ -241,11 +247,7 @@ const Masterlist = () => {
 
     const response = await fetch(dswdlogo);
     const imageBuffer = await response.arrayBuffer();
-    const imageId = workbook.addImage({
-      buffer: imageBuffer,
-      extension: "png",
-    });
-
+    const imageId = workbook.addImage({ buffer: imageBuffer, extension: "png" });
     worksheet.addImage(imageId, {
       tl: { col: 2.5, row: 0.5 },
       ext: { width: 100, height: 100 },
@@ -260,22 +262,7 @@ const Masterlist = () => {
       horizontal: "center",
     };
 
-    worksheet.mergeCells("C3", "H3");
-    worksheet.getCell("C3").value = "Regional Field Office V";
-    worksheet.getCell("C3").font = { size: 13, bold: true };
-    worksheet.getCell("C3").alignment = {
-      vertical: "middle",
-      horizontal: "center",
-    };
-
-    worksheet.mergeCells("C4", "H4");
-    worksheet.getCell("C4").value = `Generated on: ${new Date().toLocaleDateString()}`;
-    worksheet.getCell("C4").font = { italic: true, size: 11 };
-    worksheet.getCell("C4").alignment = {
-      vertical: "middle",
-      horizontal: "center",
-    };
-
+    worksheet.addRow([]);
     worksheet.addRow([]);
     worksheet.addRow([]);
 
@@ -292,26 +279,19 @@ const Masterlist = () => {
       "Missed Consecutive",
       "Last Claim Date",
     ];
-
     const headerRow = worksheet.addRow(headers);
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      cell.fill = {
+    headerRow.eachCell((c) => {
+      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      c.fill = {
         type: "pattern",
         pattern: "solid",
         fgColor: { argb: "FF2E75B6" },
       };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
+      c.alignment = { vertical: "middle", horizontal: "center" };
     });
 
-    eligibleBound.forEach((r) => {
-      const dataRow = worksheet.addRow([
+    eligibleBound.forEach((r) =>
+      worksheet.addRow([
         r.seniorId,
         `${r.surname}, ${r.firstName} ${r.middleName || ""} ${r.extName || ""}`,
         r.birthday,
@@ -323,50 +303,255 @@ const Masterlist = () => {
         r.quarter,
         r.missed,
         r.lastClaim,
-      ]);
+      ])
+    );
 
-      dataRow.eachCell((cell) => {
-        cell.alignment = { vertical: "middle", horizontal: "center" };
-        cell.border = {
-          top: { style: "thin" },
-          left: { style: "thin" },
-          bottom: { style: "thin" },
-          right: { style: "thin" },
-        };
-      });
-    });
-
-    worksheet.addRow([]);
-    worksheet.addRow(["Generated by Talisay SDO System"]).getCell(1).font = {
-      italic: true,
-      color: { argb: "FF888888" },
-    };
-
-    const today = new Date().toISOString().split("T")[0];
     const buffer = await workbook.xlsx.writeBuffer();
+    const today = new Date().toISOString().split("T")[0];
     saveAs(
       new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       }),
-      `Quarterly_Pensioners_Report_${today}.xlsx`
+      `Pensioners_Report_${quarterFilter}_${today}.xlsx`
     );
   };
 
-  // ✅ UI
+  // ✅ Print Report
+  const printReport = () => {
+    let eligibleBound = records.overall.filter(
+      (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
+    );
+    if (quarterFilter !== "All") {
+      eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
+    }
+    if (eligibleBound.length === 0) {
+      alert(
+        quarterFilter === "All"
+          ? "No eligible and bound records found to print."
+          : `No records found for ${quarterFilter}.`
+      );
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    const today = new Date().toLocaleDateString();
+    const tableRows = eligibleBound
+      .map(
+        (r) => `
+        <tr>
+          <td>${r.seniorId}</td>
+          <td>${r.surname}, ${r.firstName} ${r.middleName || ""} ${
+          r.extName || ""
+        }</td>
+          <td>${r.birthday}</td>
+          <td>${r.age}</td>
+          <td>${r.barangay}</td>
+          <td>${r.status}</td>
+          <td>${r.rfidStatus}</td>
+          <td>${r.rfidCode}</td>
+          <td>${r.quarter}</td>
+          <td>${r.missed}</td>
+          <td>${r.lastClaim}</td>
+        </tr>`
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Printable Pensioners Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1, h3 { text-align: center; margin: 5px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            th, td { border: 1px solid #444; padding: 6px; font-size: 12px; text-align: center; }
+            th { background-color: #2E75B6; color: white; }
+            img { display: block; margin: 0 auto 10px; height: 80px; }
+          </style>
+        </head>
+        <body>
+          <img src="${dswdlogo}" alt="DSWD Logo" />
+          <h1>Department of Social Welfare and Development</h1>
+          <h3>Pensioners Report - ${
+            quarterFilter === "All" ? "All Quarters" : quarterFilter
+          }</h3>
+          <p><strong>Date:</strong> ${today}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>ID Number</th>
+                <th>Name</th>
+                <th>Birthday</th>
+                <th>Age</th>
+                <th>Barangay</th>
+                <th>Status</th>
+                <th>RFID Status</th>
+                <th>RFID Code</th>
+                <th>Quarter</th>
+                <th>Missed</th>
+                <th>Last Claim</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+  
+
+  const [reportType, setReportType] = useState("overall");
+
+// ✅ Generate report based on selected type (overall, pensioners, members, pending)
+const generateOverallReport = async () => {
+  let selectedData = records[reportType] || [];
+
+  if (selectedData.length === 0) {
+    alert(`No records found for ${reportType} report.`);
+    return;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(
+    `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`
+  );
+
+  worksheet.columns = Array(10)
+    .fill()
+    .map(() => ({ width: 18 }));
+
+  const response = await fetch(dswdlogo);
+  const imageBuffer = await response.arrayBuffer();
+  const imageId = workbook.addImage({ buffer: imageBuffer, extension: "png" });
+  worksheet.addImage(imageId, {
+    tl: { col: 2.5, row: 0.5 },
+    ext: { width: 100, height: 100 },
+  });
+
+  worksheet.mergeCells("C2", "H2");
+  worksheet.getCell("C2").value =
+    "Department of Social Welfare and Development";
+  worksheet.getCell("C2").font = { size: 16, bold: true };
+  worksheet.getCell("C2").alignment = {
+    vertical: "middle",
+    horizontal: "center",
+  };
+
+  worksheet.addRow([]);
+  worksheet.addRow([]);
+  worksheet.addRow([]);
+
+  const headers = [
+    "ID Number",
+    "Name",
+    "Birthday",
+    "Age",
+    "Barangay",
+    "Status",
+    "RFID Status",
+    "RFID Code",
+    "Quarter",
+    "Last Claim",
+  ];
+  const headerRow = worksheet.addRow(headers);
+  headerRow.eachCell((c) => {
+    c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    c.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF7030A0" },
+    };
+    c.alignment = { vertical: "middle", horizontal: "center" };
+  });
+
+  selectedData.forEach((r) =>
+    worksheet.addRow([
+      r.seniorId,
+      `${r.surname}, ${r.firstName} ${r.middleName || ""} ${r.extName || ""}`,
+      r.birthday,
+      r.age,
+      r.barangay,
+      r.status,
+      r.rfidStatus,
+      r.rfidCode,
+      r.quarter,
+      r.lastClaim,
+    ])
+  );
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const today = new Date().toISOString().split("T")[0];
+  saveAs(
+    new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `${reportType}_Report_${today}.xlsx`
+  );
+};
+
+
+  //  Responsive UI
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center bg-white shadow px-6 py-4 rounded-lg">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white shadow px-6 py-4 rounded-lg gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Masterlist</h1>
-          <p className="text-gray-600">Senior Citizens Records</p>
+          <p className="text-gray-600 text-sm sm:text-base">
+            Senior Citizens Records
+          </p>
         </div>
-        <button
-          onClick={generateReport}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium shadow"
-        >
-          Generate Excel Report
-        </button>
+
+        {/* Excel Report Controls */}
+        <div className="flex flex-wrap gap-2 items-center">
+          <select
+            className="border px-3 py-2 rounded-md"
+            value={quarterFilter}
+            onChange={(e) => setQuarterFilter(e.target.value)}
+          >
+            <option value="All">All Quarters</option>
+            <option value="1st Quarter">1st Quarter</option>
+            <option value="2nd Quarter">2nd Quarter</option>
+            <option value="3rd Quarter">3rd Quarter</option>
+            <option value="4th Quarter">4th Quarter</option>
+          </select>
+
+          <button
+            onClick={generateReport}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium shadow"
+          >
+            Generate Excel Report
+          </button>
+
+          {/*  Print Report Button */}
+          <button
+            onClick={printReport}
+            className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-medium shadow"
+          >
+            Print Report
+          </button>
+
+          {/*  NEW Dropdown for Type-based Reports */}
+          <select
+            className="border px-3 py-2 rounded-md"
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+          >
+            <option value="overall">Overall List</option>
+            <option value="pensioners">Pensioners</option>
+            <option value="members">Members</option>
+            <option value="pending">New Applicants</option>
+          </select>
+
+          <button
+            onClick={generateOverallReport}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-medium shadow"
+          >
+            Generate Type Report
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -376,24 +561,22 @@ const Masterlist = () => {
           placeholder="Search by ID or name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border px-3 py-2 rounded-md w-64"
+          className="border px-3 py-2 rounded-md w-full sm:w-64"
         />
         <select
-          className="border px-3 py-2 rounded-md"
+          className="border px-3 py-2 rounded-md w-full sm:w-auto"
           value={barangayFilter}
           onChange={(e) => setBarangayFilter(e.target.value)}
         >
           <option value="All">All Barangays</option>
-          {barangays.map((brgy) => (
-            <option key={brgy} value={brgy}>
-              {brgy}
-            </option>
+          {barangays.map((b) => (
+            <option key={b}>{b}</option>
           ))}
         </select>
         {activeTab === "overall" && (
           <>
             <select
-              className="border px-3 py-2 rounded-md"
+              className="border px-3 py-2 rounded-md w-full sm:w-auto"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -404,9 +587,8 @@ const Masterlist = () => {
               <option value="Pending">Pending</option>
               <option value="Member">Member</option>
             </select>
-
             <select
-              className="border px-3 py-2 rounded-md"
+              className="border px-3 py-2 rounded-md w-full sm:w-auto"
               value={ageFilter}
               onChange={(e) => setAgeFilter(e.target.value)}
             >
@@ -419,7 +601,7 @@ const Masterlist = () => {
           </>
         )}
         <button
-          className="border border-gray-400 px-3 py-2 rounded-md hover:bg-gray-100"
+          className="border border-gray-400 px-3 py-2 rounded-md hover:bg-gray-100 w-full sm:w-auto"
           onClick={resetFilters}
         >
           Reset
@@ -427,7 +609,7 @@ const Masterlist = () => {
       </div>
 
       {/* Tabs */}
-      <div className="mt-6 flex">
+      <div className="mt-6 flex flex-wrap">
         {[
           { key: "overall", label: "Overall List" },
           { key: "pensioners", label: "Pensioners" },
@@ -437,7 +619,7 @@ const Masterlist = () => {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`px-6 py-2 rounded-t-lg font-semibold ${
+            className={`flex-1 sm:flex-none px-4 py-2 text-sm sm:text-base rounded-t-lg font-semibold ${
               activeTab === tab.key
                 ? "bg-orange-500 text-white"
                 : "bg-gray-200 text-gray-700"
@@ -448,76 +630,137 @@ const Masterlist = () => {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto shadow border border-gray-200 rounded-b-lg bg-white">
+      {/* Records Table (same as before) */}
+      <div className="shadow border border-gray-200 rounded-b-lg bg-white">
         {loading ? (
           <p className="p-4 text-center text-gray-500">Loading records...</p>
         ) : filteredRecords.length === 0 ? (
           <p className="p-4 text-center text-gray-500">No records found.</p>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 text-left">
-              <tr>
-                <th className="px-4 py-2">ID Number</th>
-                <th className="px-4 py-2">Name</th>
-                <th className="px-4 py-2">Birthday</th>
-                <th className="px-4 py-2">Age</th>
-                <th className="px-4 py-2">Barangay</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">RFID Status</th>
-                <th className="px-4 py-2">RFID Code</th>
-                <th className="px-4 py-2">Quarter Claim</th>
-                <th className="px-4 py-2">Missed Consecutive</th>
-                <th className="px-4 py-2">Last Claim Date</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-100 text-left">
+                  <tr>
+                    <th className="px-4 py-2">ID Number</th>
+                    <th
+                      className="px-4 py-2 cursor-pointer select-none"
+                      onClick={toggleSortOrder}
+                    >
+                      Name{" "}
+                      <span className="text-gray-500 text-xs">
+                        ({sortOrder === "asc" ? "A–Z" : "Z–A"})
+                      </span>
+                    </th>
+                    <th className="px-4 py-2">Birthday</th>
+                    <th className="px-4 py-2">Age</th>
+                    <th className="px-4 py-2">Barangay</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">RFID</th>
+                    <th className="px-4 py-2">Quarter</th>
+                    <th className="px-4 py-2">Missed</th>
+                    <th className="px-4 py-2">Last Claim</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRecords.map((r, i) => (
+                    <tr
+                      key={i}
+                      className={`border-t hover:bg-gray-50 ${
+                        i % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      }`}
+                    >
+                      <td className="px-4 py-2">{r.seniorId}</td>
+                      <td className="px-4 py-2">
+                        {r.surname}, {r.firstName} {r.middleName} {r.extName}
+                      </td>
+                      <td className="px-4 py-2">{r.birthday}</td>
+                      <td className="px-4 py-2 text-center">{r.age}</td>
+                      <td className="px-4 py-2">{r.barangay}</td>
+                      <td
+                        className={`px-4 py-2 font-medium ${
+                          r.status === "Eligible"
+                            ? "text-green-600"
+                            : r.status === "Pending"
+                            ? "text-yellow-600"
+                            : r.status === "Removed"
+                            ? "text-red-600"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        {r.status}
+                      </td>
+                      <td
+                        className={`px-4 py-2 ${
+                          r.rfidStatus === "Bound"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {r.rfidCode}
+                      </td>
+                      <td className="px-4 py-2">{r.quarter}</td>
+                      <td className="px-4 py-2 text-center">{r.missed}</td>
+                      <td className="px-4 py-2">{r.lastClaim}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden flex flex-col gap-3 p-3">
               {filteredRecords.map((r, i) => (
-                <tr key={r.id || i} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-2 font-mono text-gray-700">
-                    {r.seniorId}
-                  </td>
-                  <td className="px-4 py-2 font-medium text-gray-800">
-                    {r.surname}, {r.firstName} {r.middleName || ""}{" "}
-                    {r.extName || ""}
-                  </td>
-                  <td className="px-4 py-2">{r.birthday}</td>
-                  <td className="px-4 py-2 text-center">{r.age}</td>
-                  <td className="px-4 py-2">{r.barangay}</td>
-                  <td
-                    className={`px-4 py-2 font-semibold ${
-                      r.status === "Eligible"
-                        ? "text-green-600"
-                        : r.status === "Active"
-                        ? "text-blue-600"
-                        : r.status === "Pending"
-                        ? "text-yellow-600"
-                        : r.status === "Member"
-                        ? "text-purple-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {r.status}
-                  </td>
-                  <td
-                    className={`px-4 py-2 font-medium ${
-                      r.rfidStatus === "Bound"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {r.rfidStatus}
-                  </td>
-                  <td className="px-4 py-2 text-center">{r.rfidCode}</td>
-                  <td className="px-4 py-2 text-center font-semibold text-blue-600">
-                    {r.quarter}
-                  </td>
-                  <td className="px-4 py-2 text-center">{r.missed}</td>
-                  <td className="px-4 py-2 text-center">{r.lastClaim}</td>
-                </tr>
+                <div
+                  key={i}
+                  className="border rounded-lg p-4 bg-white shadow-sm flex flex-col gap-2"
+                >
+                  <div className="font-bold text-lg text-gray-800">
+                    {r.surname}, {r.firstName}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>ID:</strong> {r.seniorId}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>Barangay:</strong> {r.barangay}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>Age:</strong> {r.age}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>Status:</strong>{" "}
+                    <span
+                      className={`font-medium ${
+                        r.status === "Eligible"
+                          ? "text-green-600"
+                          : r.status === "Pending"
+                          ? "text-yellow-600"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {r.status}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <strong>RFID:</strong>{" "}
+                    <span
+                      className={`${
+                        r.rfidStatus === "Bound"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {r.rfidCode}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Last Claim: {r.lastClaim} | {r.quarter}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
     </div>

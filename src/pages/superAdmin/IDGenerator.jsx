@@ -222,46 +222,7 @@ export default function SeniorRfidBinding() {
         )}
       </div>
 
-      {/* 🔹 Bound Seniors Section */}
-      <div className="bg-white shadow rounded-2xl p-6 border border-gray-200">
-        <h2 className="text-lg font-semibold mb-4">RFID Bound Seniors ({bindings.length})</h2>
-        {bindings.length === 0 ? (
-          <p className="text-center text-gray-400">No RFID bindings yet.</p>
-        ) : (
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {bindings.map((b, i) => (
-              <div
-                key={i}
-                className="border rounded-xl p-4 bg-gray-50 shadow-sm hover:shadow-md transition"
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <FaUserCircle className="text-gray-500 text-3xl" />
-                  <div>
-                    <h3 className="font-semibold text-gray-800">
-                      {b.firstName} {b.lastName}
-                    </h3>
-                    <p className="text-sm text-gray-500">{b.barangay}</p>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 mb-1">
-                  <strong>RFID:</strong> <span className="font-mono">{b.rfidCode}</span>
-                </p>
-                <p className="text-sm text-gray-600 mb-1">
-                  <strong>Status:</strong> {b.status || "Eligible"}
-                </p>
-                <p className="text-sm text-gray-600 mb-1">
-                  <strong>RFID Status:</strong>{" "}
-                  {b.rfidCode ? (
-                    <span className="text-green-600 font-semibold">Bound</span>
-                  ) : (
-                    <span className="text-red-500 font-semibold">Unbound</span>
-                  )}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      
 
       {/* 🔹 Unbound Seniors Section */}
       <div className="bg-white shadow rounded-2xl p-6 border border-gray-200">
@@ -336,6 +297,46 @@ export default function SeniorRfidBinding() {
                 >
                   {selectedSenior?.id === senior.id ? "Unselect" : "Select"}
                 </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* 🔹 Bound Seniors Section */}
+      <div className="bg-white shadow rounded-2xl p-6 border border-gray-200">
+        <h2 className="text-lg font-semibold mb-4">RFID Bound Seniors ({bindings.length})</h2>
+        {bindings.length === 0 ? (
+          <p className="text-center text-gray-400">No RFID bindings yet.</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {bindings.map((b, i) => (
+              <div
+                key={i}
+                className="border rounded-xl p-4 bg-gray-50 shadow-sm hover:shadow-md transition"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <FaUserCircle className="text-gray-500 text-3xl" />
+                  <div>
+                    <h3 className="font-semibold text-gray-800">
+                      {b.firstName} {b.lastName}
+                    </h3>
+                    <p className="text-sm text-gray-500">{b.barangay}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 mb-1">
+                  <strong>RFID:</strong> <span className="font-mono">{b.rfidCode}</span>
+                </p>
+                <p className="text-sm text-gray-600 mb-1">
+                  <strong>Status:</strong> {b.status || "Eligible"}
+                </p>
+                <p className="text-sm text-gray-600 mb-1">
+                  <strong>RFID Status:</strong>{" "}
+                  {b.rfidCode ? (
+                    <span className="text-green-600 font-semibold">Bound</span>
+                  ) : (
+                    <span className="text-red-500 font-semibold">Unbound</span>
+                  )}
+                </p>
               </div>
             ))}
           </div>

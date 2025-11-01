@@ -1,13 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { rtdb } from "../../router/Firebase";
 import { ref, onValue } from "firebase/database";
-import { FaFolder, FaFolderOpen } from "react-icons/fa";
+import {
+  FaFolder,
+  FaFolderOpen,
+  FaCheckCircle,
+  FaTimesCircle,
+} from "react-icons/fa";
 
 export default function RfidClaimingInterface() {
   const [showModal, setShowModal] = useState(false);
   const [beneficiary, setBeneficiary] = useState(null);
   const [groupedScans, setGroupedScans] = useState({});
   const [expandedMonths, setExpandedMonths] = useState({});
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docToView, setDocToView] = useState(null);
+
   const lastScanRef = useRef("");
   const timerRef = useRef(null);
 
@@ -18,13 +26,21 @@ export default function RfidClaimingInterface() {
       const data = snapshot.val();
       if (!data) return;
 
-      const entries = Object.entries(data).map(([rfid, info]) => ({ rfid, ...info }));
+      const entries = Object.entries(data).map(([rfid, info]) => ({
+        rfid,
+        ...info,
+      }));
 
       // Group entries by claim month
       const grouped = {};
       entries.forEach((entry) => {
-        const claimDate = entry.claimDate ? new Date(entry.claimDate) : new Date();
-        const monthYear = claimDate.toLocaleString("default", { month: "long", year: "numeric" });
+        const claimDate = entry.claimDate
+          ? new Date(entry.claimDate)
+          : new Date();
+        const monthYear = claimDate.toLocaleString("default", {
+          month: "long",
+          year: "numeric",
+        });
         if (!grouped[monthYear]) grouped[monthYear] = [];
         grouped[monthYear].push(entry);
       });
@@ -64,18 +80,33 @@ export default function RfidClaimingInterface() {
     }, 5000);
   };
 
+  const openDocumentModal = (url, title) => {
+    setDocToView({ url, title });
+    setShowDocModal(true);
+  };
+
+  const closeDocumentModal = () => {
+    setShowDocModal(false);
+    setDocToView(null);
+  };
+
   return (
     <>
       <div className="flex flex-col items-center justify-start min-h-screen bg-gray-50 p-6">
-        <h1 className="text-4xl font-bold mb-4 text-gray-800">RFID Claiming Interface</h1>
+        <h1 className="text-4xl font-bold mb-4 text-gray-800">
+          RFID Claiming Interface
+        </h1>
         <p className="text-gray-600 mb-6 text-center max-w-xl">
-          Scan the beneficiary RFID tag or click a record below to view their claim details.
+          Scan the beneficiary RFID tag or click a record below to view their
+          claim details.
         </p>
 
         {/* Grouped Beneficiaries */}
         <div className="w-full max-w-3xl bg-white rounded-xl shadow-lg p-6 overflow-y-auto max-h-[75vh]">
           {Object.keys(groupedScans).length === 0 ? (
-            <p className="text-gray-500 text-center">No beneficiaries found.</p>
+            <p className="text-gray-500 text-center">
+              No beneficiaries found.
+            </p>
           ) : (
             Object.entries(groupedScans).map(([monthYear, items]) => (
               <div key={monthYear} className="mb-5">
@@ -116,11 +147,18 @@ export default function RfidClaimingInterface() {
                             <strong>Senior ID:</strong> {item.seniorId}
                             {item.suffix ? `-${item.suffix}` : ""}
                           </p>
-                          <p className="text-gray-600"><strong>RFID:</strong> {item.rfid}</p>
-                          <p className="text-gray-700">
-                            <strong>Name:</strong> {item.firstName} {item.middleName} {item.lastName}{item.suffix ? ` ${item.suffix}` : ""}
+                          <p className="text-gray-600">
+                            <strong>RFID:</strong> {item.rfid}
                           </p>
-                          <p className="text-gray-600"><strong>Age:</strong> {item.age} | <strong>Barangay:</strong> {item.barangay}</p>
+                          <p className="text-gray-700">
+                            <strong>Name:</strong> {item.firstName}{" "}
+                            {item.middleName} {item.lastName}
+                            {item.suffix ? ` ${item.suffix}` : ""}
+                          </p>
+                          <p className="text-gray-600">
+                            <strong>Age:</strong> {item.age} |{" "}
+                            <strong>Barangay:</strong> {item.barangay}
+                          </p>
                         </div>
                       </li>
                     ))}
@@ -132,7 +170,7 @@ export default function RfidClaimingInterface() {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Main Beneficiary Modal */}
       {showModal && beneficiary && (
         <div
           className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 p-4"
@@ -147,7 +185,9 @@ export default function RfidClaimingInterface() {
             className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center overflow-y-auto max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Claim Verified</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              Claim Verified
+            </h2>
 
             {/* Profile */}
             {beneficiary.profilePicture ? (
@@ -163,40 +203,95 @@ export default function RfidClaimingInterface() {
             )}
 
             <div className="text-left space-y-2 mb-4">
-              <p><strong>Senior ID:</strong> {beneficiary.seniorId}{beneficiary.suffix ? `-${beneficiary.suffix}` : ""}</p>
-              <p><strong>RFID:</strong> {beneficiary.rfid}</p>
-              <p><strong>Name:</strong> {beneficiary.firstName} {beneficiary.middleName} {beneficiary.lastName}{beneficiary.suffix ? ` ${beneficiary.suffix}` : ""}</p>
-              <p><strong>Age:</strong> {beneficiary.age}</p>
-              <p><strong>Barangay:</strong> {beneficiary.barangay}</p>
-              <p><strong>Gender:</strong> {beneficiary.gender}</p>
-              <p><strong>Contact:</strong> {beneficiary.contactNumber}</p>
               <p>
-                <strong>Valid I.D:</strong>{" "}
-                {beneficiary.barangayCertificate ? (
-                  <a
-                    href={beneficiary.barangayCertificate}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    View
-                  </a>
-                ) : "Not uploaded"}
+                <strong>Senior ID:</strong> {beneficiary.seniorId}
+                {beneficiary.suffix ? `-${beneficiary.suffix}` : ""}
               </p>
               <p>
-                <strong>Birth Certificate:</strong>{" "}
-                {beneficiary.birthCertificate ? (
-                  <a
-                    href={beneficiary.birthCertificate}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline"
+                <strong>RFID:</strong> {beneficiary.rfid}
+              </p>
+              <p>
+                <strong>Name:</strong> {beneficiary.firstName}{" "}
+                {beneficiary.middleName} {beneficiary.lastName}
+                {beneficiary.suffix ? ` ${beneficiary.suffix}` : ""}
+              </p>
+              <p>
+                <strong>Age:</strong> {beneficiary.age}
+              </p>
+              <p>
+                <strong>Barangay:</strong> {beneficiary.barangay}
+              </p>
+              <p>
+                <strong>Gender:</strong> {beneficiary.gender}
+              </p>
+              <p>
+                <strong>Contact:</strong> {beneficiary.contactNumber}
+              </p>
+
+              {/* Barangay Certificate */}
+              <div className="flex items-center justify-between">
+                <p className="font-medium">
+                  <strong>Valid I.D:</strong>{" "}
+                  {beneficiary.barangayCertificate ? (
+                    <span className="text-green-600 flex items-center gap-1">
+                      <FaCheckCircle /> Available
+                    </span>
+                  ) : (
+                    <span className="text-red-500 flex items-center gap-1">
+                      <FaTimesCircle /> Not Uploaded
+                    </span>
+                  )}
+                </p>
+                {beneficiary.barangayCertificate && (
+                  <button
+                    onClick={() =>
+                      openDocumentModal(
+                        beneficiary.barangayCertificate,
+                        "Valid I.D"
+                      )
+                    }
+                    className="text-blue-600 underline hover:text-blue-800"
                   >
                     View
-                  </a>
-                ) : "Not uploaded"}
+                  </button>
+                )}
+              </div>
+
+              {/* Birth Certificate */}
+              <div className="flex items-center justify-between">
+                <p className="font-medium">
+                  <strong>Birth Certificate:</strong>{" "}
+                  {beneficiary.birthCertificate ? (
+                    <span className="text-green-600 flex items-center gap-1">
+                      <FaCheckCircle /> Available
+                    </span>
+                  ) : (
+                    <span className="text-red-500 flex items-center gap-1">
+                      <FaTimesCircle /> Not Uploaded
+                    </span>
+                  )}
+                </p>
+                {beneficiary.birthCertificate && (
+                  <button
+                    onClick={() =>
+                      openDocumentModal(
+                        beneficiary.birthCertificate,
+                        "Birth Certificate"
+                      )
+                    }
+                    className="text-blue-600 underline hover:text-blue-800"
+                  >
+                    View
+                  </button>
+                )}
+              </div>
+
+              <p>
+                <strong>Claim Date:</strong>{" "}
+                {new Date(
+                  beneficiary.claimDate || new Date()
+                ).toLocaleString()}
               </p>
-              <p><strong>Claim Date:</strong> {new Date(beneficiary.claimDate || new Date()).toLocaleString()}</p>
             </div>
 
             <button
@@ -207,6 +302,44 @@ export default function RfidClaimingInterface() {
                 if (timerRef.current) clearTimeout(timerRef.current);
               }}
               className="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {showDocModal && docToView && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4"
+          onClick={closeDocumentModal}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-4 w-full max-w-3xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-3 text-center">
+              {docToView.title}
+            </h3>
+
+            {docToView.url.endsWith(".pdf") ? (
+              <iframe
+                src={docToView.url}
+                title={docToView.title}
+                className="w-full h-[70vh] border rounded-lg"
+              ></iframe>
+            ) : (
+              <img
+                src={docToView.url}
+                alt={docToView.title}
+                className="w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            )}
+
+            <button
+              onClick={closeDocumentModal}
+              className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition w-full"
             >
               Close
             </button>

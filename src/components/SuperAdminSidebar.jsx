@@ -50,7 +50,7 @@ const SuperAdminSidebar = () => {
       {/* Backdrop for mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 z-40"
+          className="fixed inset-0  bg-opacity-30 z-40"
           onClick={() => setIsOpen(false)}
         ></div>
       )}
