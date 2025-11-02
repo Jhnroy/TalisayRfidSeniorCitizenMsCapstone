@@ -26,10 +26,19 @@ export default function RfidClaimingInterface() {
       const data = snapshot.val();
       if (!data) return;
 
-      const entries = Object.entries(data).map(([rfid, info]) => ({
+      // Convert entries
+      let entries = Object.entries(data).map(([rfid, info]) => ({
         rfid,
         ...info,
       }));
+
+      // ✅ Filter beneficiaries who have NO pension
+      entries = entries.filter((entry) => {
+        const pension = entry.monthlyPension
+          ? String(entry.monthlyPension).trim()
+          : "";
+        return pension === "" || pension === "0" || pension === "null" || pension === "undefined";
+      });
 
       // Group entries by claim month
       const grouped = {};
@@ -97,15 +106,14 @@ export default function RfidClaimingInterface() {
           RFID Claiming Interface
         </h1>
         <p className="text-gray-600 mb-6 text-center max-w-xl">
-          Scan the beneficiary RFID tag or click a record below to view their
-          claim details.
+          Showing only beneficiaries who have <strong>no monthly pension</strong>.
         </p>
 
         {/* Grouped Beneficiaries */}
         <div className="w-full max-w-3xl bg-white rounded-xl shadow-lg p-6 overflow-y-auto max-h-[75vh]">
           {Object.keys(groupedScans).length === 0 ? (
             <p className="text-gray-500 text-center">
-              No beneficiaries found.
+              No beneficiaries without pension found.
             </p>
           ) : (
             Object.entries(groupedScans).map(([monthYear, items]) => (
@@ -159,6 +167,14 @@ export default function RfidClaimingInterface() {
                             <strong>Age:</strong> {item.age} |{" "}
                             <strong>Barangay:</strong> {item.barangay}
                           </p>
+                          <p className="text-gray-500">
+                            <strong>Monthly Income:</strong>{" "}
+                            {item.monthlyIncome || "N/A"}
+                          </p>
+                          <p className="text-gray-500">
+                            <strong>Monthly Pension:</strong>{" "}
+                            {item.monthlyPension || "None"}
+                          </p>
                         </div>
                       </li>
                     ))}
@@ -208,9 +224,6 @@ export default function RfidClaimingInterface() {
                 {beneficiary.suffix ? `-${beneficiary.suffix}` : ""}
               </p>
               <p>
-                <strong>RFID:</strong> {beneficiary.rfid}
-              </p>
-              <p>
                 <strong>Name:</strong> {beneficiary.firstName}{" "}
                 {beneficiary.middleName} {beneficiary.lastName}
                 {beneficiary.suffix ? ` ${beneficiary.suffix}` : ""}
@@ -222,69 +235,16 @@ export default function RfidClaimingInterface() {
                 <strong>Barangay:</strong> {beneficiary.barangay}
               </p>
               <p>
-                <strong>Gender:</strong> {beneficiary.gender}
+                <strong>Occupation:</strong> {beneficiary.occupation || "N/A"}
               </p>
               <p>
-                <strong>Contact:</strong> {beneficiary.contactNumber}
+                <strong>Monthly Income:</strong>{" "}
+                {beneficiary.monthlyIncome || "N/A"}
               </p>
-
-              {/* Barangay Certificate */}
-              <div className="flex items-center justify-between">
-                <p className="font-medium">
-                  <strong>Valid I.D:</strong>{" "}
-                  {beneficiary.barangayCertificate ? (
-                    <span className="text-green-600 flex items-center gap-1">
-                      <FaCheckCircle /> Available
-                    </span>
-                  ) : (
-                    <span className="text-red-500 flex items-center gap-1">
-                      <FaTimesCircle /> Not Uploaded
-                    </span>
-                  )}
-                </p>
-                {beneficiary.barangayCertificate && (
-                  <button
-                    onClick={() =>
-                      openDocumentModal(
-                        beneficiary.barangayCertificate,
-                        "Valid I.D"
-                      )
-                    }
-                    className="text-blue-600 underline hover:text-blue-800"
-                  >
-                    View
-                  </button>
-                )}
-              </div>
-
-              {/* Birth Certificate */}
-              <div className="flex items-center justify-between">
-                <p className="font-medium">
-                  <strong>Birth Certificate:</strong>{" "}
-                  {beneficiary.birthCertificate ? (
-                    <span className="text-green-600 flex items-center gap-1">
-                      <FaCheckCircle /> Available
-                    </span>
-                  ) : (
-                    <span className="text-red-500 flex items-center gap-1">
-                      <FaTimesCircle /> Not Uploaded
-                    </span>
-                  )}
-                </p>
-                {beneficiary.birthCertificate && (
-                  <button
-                    onClick={() =>
-                      openDocumentModal(
-                        beneficiary.birthCertificate,
-                        "Birth Certificate"
-                      )
-                    }
-                    className="text-blue-600 underline hover:text-blue-800"
-                  >
-                    View
-                  </button>
-                )}
-              </div>
+              <p>
+                <strong>Monthly Pension:</strong>{" "}
+                {beneficiary.monthlyPension || "None"}
+              </p>
 
               <p>
                 <strong>Claim Date:</strong>{" "}
