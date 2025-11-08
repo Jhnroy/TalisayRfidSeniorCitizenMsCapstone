@@ -406,15 +406,37 @@ const Masterlist = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-// ✅ Generate report based on selected type (overall, pensioners, members, pending)
+//  Generate report based on selected type (overall, pensioners, members, pending)
 const generateOverallReport = async () => {
   let selectedData = records[reportType] || [];
+
+  // ✅ Optional Date Range Filtering
+  if (startDate || endDate) {
+    selectedData = selectedData.filter((r) => {
+      if (!r.lastClaim || r.lastClaim === "Never") return false;
+
+      const date = new Date(r.lastClaim);
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      if (start && end) return date >= start && date <= end;
+      if (start) return date >= start;
+      if (end) return date <= end;
+      return true;
+    });
+
+    if (selectedData.length === 0) {
+      alert("No records found within the selected date range.");
+      return;
+    }
+  }
 
   if (selectedData.length === 0) {
     alert(`No records found for ${reportType} report.`);
     return;
   }
 
+  // ✅ Excel Workbook setup
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(
     `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`
@@ -424,6 +446,7 @@ const generateOverallReport = async () => {
     .fill()
     .map(() => ({ width: 18 }));
 
+  // ✅ Add logo
   const response = await fetch(dswdlogo);
   const imageBuffer = await response.arrayBuffer();
   const imageId = workbook.addImage({ buffer: imageBuffer, extension: "png" });
@@ -432,6 +455,7 @@ const generateOverallReport = async () => {
     ext: { width: 100, height: 100 },
   });
 
+  // ✅ Header Title
   worksheet.mergeCells("C2", "H2");
   worksheet.getCell("C2").value =
     "Department of Social Welfare and Development";
@@ -445,6 +469,7 @@ const generateOverallReport = async () => {
   worksheet.addRow([]);
   worksheet.addRow([]);
 
+  // ✅ Table Headers
   const headers = [
     "ID Number",
     "Name",
@@ -467,7 +492,22 @@ const generateOverallReport = async () => {
     };
     c.alignment = { vertical: "middle", horizontal: "center" };
   });
+  let eligibleBound = records.overall.filter(
+      (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
+    );
+    if (quarterFilter !== "All") {
+      eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
+    }
+    if (eligibleBound.length === 0) {
+      alert(
+        quarterFilter === "All"
+          ? "No eligible and bound records found to print."
+          : `No records found for ${quarterFilter}.`
+      );
+      return;
+    }
 
+  // ✅ Add Data Rows
   selectedData.forEach((r) =>
     worksheet.addRow([
       r.seniorId,
@@ -483,6 +523,7 @@ const generateOverallReport = async () => {
     ])
   );
 
+  // ✅ Save Excel File
   const buffer = await workbook.xlsx.writeBuffer();
   const today = new Date().toISOString().split("T")[0];
   saveAs(
@@ -490,6 +531,12 @@ const generateOverallReport = async () => {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     }),
     `${reportType}_Report_${today}.xlsx`
+  );
+
+  alert(
+    `Generated ${selectedData.length} records ${
+      startDate || endDate ? "within the selected date range" : ""
+    }.`
   );
 };
 
@@ -512,36 +559,38 @@ const isWithinDateRange = (recordDate) => {
   if (end) return date <= end;
   return true;
 };
-// 🧠 Function: Filter and generate report by date range
-const generateDateRangeReport = async () => {
-  if (!startDate && !endDate) {
-    alert("Please select a start or end date.");
-    return;
-  }
 
-  // Example: Filter your data source based on date
-  const filtered = records.overall.filter((r) => {
-    if (!r.lastClaim || r.lastClaim === "Never") return false;
 
-    const date = new Date(r.lastClaim);
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
+//  Function: Filter and generate report by date range
+// const generateDateRangeReport = async () => {
+//   if (!startDate && !endDate) {
+//     alert("Please select a start or end date.");
+//     return;
+//   }
 
-    if (start && end) return date >= start && date <= end;
-    if (start) return date >= start;
-    if (end) return date <= end;
-    return true;
-  });
+//   // Example: Filter your data source based on date
+//   const filtered = records.overall.filter((r) => {
+//     if (!r.lastClaim || r.lastClaim === "Never") return false;
 
-  if (filtered.length === 0) {
-    alert("No records found within the selected date range.");
-    return;
-  }
+//     const date = new Date(r.lastClaim);
+//     const start = startDate ? new Date(startDate) : null;
+//     const end = endDate ? new Date(endDate) : null;
 
-  // 🧾 Optional: export to Excel or print (replace with your existing logic)
-  console.log("Filtered Data:", filtered);
-  alert(`Generated ${filtered.length} records within the selected date range.`);
-};
+//     if (start && end) return date >= start && date <= end;
+//     if (start) return date >= start;
+//     if (end) return date <= end;
+//     return true;
+//   });
+
+//   if (filtered.length === 0) {
+//     alert("No records found within the selected date range.");
+//     return;
+//   }
+
+//   // 🧾 Optional: export to Excel or print (replace with your existing logic)
+//   console.log("Filtered Data:", filtered);
+//   alert(`Generated ${filtered.length} records within the selected date range.`);
+// };
 
   //  Responsive UI
   return (
@@ -555,82 +604,82 @@ const generateDateRangeReport = async () => {
           </p>
         </div>
 
-           {/* 🗓️ Date Range */}
-  <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-    <div className="flex flex-col">
-      <label className="text-gray-600 text-sm font-medium mb-1">From</label>
-      <input
-        type="date"
-        className="border px-3 py-2 rounded-md text-sm"
-        value={startDate}
-        onChange={(e) => setStartDate(e.target.value)}
-      />
-    </div>
-    <div className="flex flex-col">
-      <label className="text-gray-600 text-sm font-medium mb-1">To</label>
-      <input
-        type="date"
-        className="border px-3 py-2 rounded-md text-sm"
-        value={endDate}
-        onChange={(e) => setEndDate(e.target.value)}
-      />
-    </div>
-    <button
-      onClick={generateDateRangeReport}
-      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium shadow text-sm sm:self-end"
-    >
-      Generate Date Range Report
-    </button>
-  </div>
-
-  {/* 📋 Report Type */}
-  <div className="flex flex-col">
-    <label className="text-gray-600 text-sm font-medium mb-1">Report Type</label>
-    <select
-      className="border px-3 py-2 rounded-md text-sm"
-      value={reportType}
-      onChange={(e) => setReportType(e.target.value)}
-    >
-      <option value="overall">Overall List</option>
-      <option value="pensioners">Pensioners</option>
-      <option value="members">Members</option>
-      <option value="pending">New Applicants</option>
-    </select>
-  </div>
-
-  {/* 🕓 Quarter Filter */}
-  <div className="flex flex-col">
-    <label className="text-gray-600 text-sm font-medium mb-1">Quarter</label>
-    <select
-      className="border px-3 py-2 rounded-md text-sm"
-      value={quarterFilter}
-      onChange={(e) => setQuarterFilter(e.target.value)}
-    >
-      <option value="All">All Quarters</option>
-      <option value="1st Quarter">1st Quarter</option>
-      <option value="2nd Quarter">2nd Quarter</option>
-      <option value="3rd Quarter">3rd Quarter</option>
-      <option value="4th Quarter">4th Quarter</option>
-    </select>
-  </div>
-
-  {/* 🧾 Action Buttons */}
-  <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
-    <button
-      onClick={printReport}
-      className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-medium shadow text-sm"
-    >
-      Print Report
-    </button>
-
-    <button
-      onClick={generateOverallReport}
-      className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-medium shadow text-sm"
-    >
-      Generate Type Report
-    </button>
-  </div>
+           {/*  Date Range */}
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+        <div className="flex flex-col">
+          <label className="text-gray-600 text-sm font-medium mb-1">From</label>
+          <input
+            type="date"
+            className="border px-3 py-2 rounded-md text-sm"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-gray-600 text-sm font-medium mb-1">To</label>
+          <input
+            type="date"
+            className="border px-3 py-2 rounded-md text-sm"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
+        {/* <button
+          onClick={generateDateRangeReport}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium shadow text-sm sm:self-end"
+        >
+          Generate Date Range Report
+        </button> */}
       </div>
+
+      {/*  Report Type */}
+      <div className="flex flex-col">
+        <label className="text-gray-600 text-sm font-medium mb-1">Report Type</label>
+        <select
+          className="border px-3 py-2 rounded-md text-sm"
+          value={reportType}
+          onChange={(e) => setReportType(e.target.value)}
+        >
+          <option value="overall">Overall List</option>
+          <option value="pensioners">Pensioners</option>
+          <option value="members">Members</option>
+          <option value="pending">New Applicants</option>
+        </select>
+      </div>
+
+      {/*  Quarter Filter */}
+      <div className="flex flex-col">
+        <label className="text-gray-600 text-sm font-medium mb-1">Quarter</label>
+        <select
+          className="border px-3 py-2 rounded-md text-sm"
+          value={quarterFilter}
+          onChange={(e) => setQuarterFilter(e.target.value)}
+        >
+          <option value="All">All Quarters</option>
+          <option value="1st Quarter">1st Quarter</option>
+          <option value="2nd Quarter">2nd Quarter</option>
+          <option value="3rd Quarter">3rd Quarter</option>
+          <option value="4th Quarter">4th Quarter</option>
+        </select>
+      </div>
+
+      {/*  Action Buttons */}
+      <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
+        <button
+          onClick={printReport}
+          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-medium shadow text-sm"
+        >
+          Print Report
+        </button>
+
+        <button
+          onClick={generateOverallReport}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-medium shadow text-sm"
+        >
+          Generate Type Report
+        </button>
+      </div>
+    </div>
 
       {/* Filters */}
       <div className="mt-4 bg-white shadow p-4 rounded-lg flex flex-wrap gap-3 items-center">
