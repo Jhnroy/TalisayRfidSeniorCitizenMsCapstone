@@ -20,7 +20,7 @@ const barangays = [
   "Sto. Niño",
 ];
 
-// ✅ Format date safely
+// Format date
 const formatDate = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "Never";
   try {
@@ -38,7 +38,7 @@ const formatDate = (dateStr) => {
   }
 };
 
-// ✅ Compute age
+// Compute age
 const getAge = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "N/A";
   const today = new Date();
@@ -49,14 +49,14 @@ const getAge = (dateStr) => {
   return age;
 };
 
-// ✅ Format full name
+// Format full name
 const formatFullName = (last, first, middle, ext) => {
   const middleInitial = middle ? `${middle.charAt(0)}.` : "";
   const suffix = ext ? ` ${ext}` : "";
   return `${last}, ${first} ${middleInitial}${suffix}`.trim();
 };
 
-// ✅ Determine quarter from date
+// Determine quarter
 const determineQuarter = (dateStr) => {
   if (!dateStr || dateStr === "Never") return "N/A";
   const month = new Date(dateStr).getMonth() + 1;
@@ -76,10 +76,14 @@ const Masterlist = () => {
   });
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
   const [barangayFilter, setBarangayFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [ageFilter, setAgeFilter] = useState("All");
+
+  const [nameSort, setNameSort] = useState("asc");
+
   const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => {
@@ -165,9 +169,10 @@ const Masterlist = () => {
     };
   }, []);
 
-  // ✅ Filtering logic
+  // FILTERING + SORTING
   useEffect(() => {
     if (loading) return;
+
     let sourceData = [];
     if (activeTab === "overall") sourceData = records.overall;
     else if (activeTab === "pensioners") sourceData = records.pensioners;
@@ -175,30 +180,36 @@ const Masterlist = () => {
 
     let filtered = [...sourceData];
 
-    if (search.trim() !== "")
-      filtered = filtered.filter((row) =>
-        formatFullName(
+    // ⭐ SEARCH BY ID OR NAME ⭐
+    if (search.trim() !== "") {
+      filtered = filtered.filter((row) => {
+        const fullName = formatFullName(
           row.surname,
           row.firstName,
           row.middleName,
           row.suffix
-        )
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      );
+        ).toLowerCase();
 
+        return (
+          row.seniorId.toLowerCase().includes(search.toLowerCase()) ||
+          fullName.includes(search.toLowerCase())
+        );
+      });
+    }
+
+    // Barangay filter
     if (barangayFilter !== "All")
       filtered = filtered.filter(
-        (row) => row.barangay?.toLowerCase() === barangayFilter.toLowerCase()
+        (row) => row.barangay.toLowerCase() === barangayFilter.toLowerCase()
       );
 
+    // Status filter
     if (statusFilter !== "All" && activeTab === "overall")
       filtered = filtered.filter(
-        (row) =>
-          (row.status || "Active").toLowerCase() ===
-          statusFilter.toLowerCase()
+        (row) => row.status.toLowerCase() === statusFilter.toLowerCase()
       );
 
+    // Age filter
     if (ageFilter !== "All") {
       filtered = filtered.filter((row) => {
         const age = row.age;
@@ -219,14 +230,32 @@ const Masterlist = () => {
       });
     }
 
+    // Sort A–Z or Z–A
+    filtered.sort((a, b) => {
+      const nameA = formatFullName(a.surname, a.firstName, a.middleName, a.suffix).toLowerCase();
+      const nameB = formatFullName(b.surname, b.firstName, b.middleName, b.suffix).toLowerCase();
+
+      return nameSort === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+
     setFilteredRecords(filtered);
-  }, [search, barangayFilter, statusFilter, ageFilter, activeTab, records, loading]);
+  }, [
+    search,
+    barangayFilter,
+    statusFilter,
+    ageFilter,
+    nameSort,
+    activeTab,
+    records,
+    loading,
+  ]);
 
   const resetFilters = () => {
     setSearch("");
     setBarangayFilter("All");
     setStatusFilter("All");
     setAgeFilter("All");
+    setNameSort("asc");
     setActiveTab("overall");
   };
 
@@ -239,11 +268,12 @@ const Masterlist = () => {
       <div className="mt-4 flex flex-wrap gap-2 items-center">
         <input
           type="text"
-          placeholder="Search by name..."
+          placeholder="Search by ID or Name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="border px-3 py-2 rounded-md w-64"
         />
+
         <select
           className="border px-3 py-2 rounded-md"
           value={barangayFilter}
@@ -256,6 +286,7 @@ const Masterlist = () => {
             </option>
           ))}
         </select>
+
         {activeTab === "overall" && (
           <select
             className="border px-3 py-2 rounded-md"
@@ -268,6 +299,7 @@ const Masterlist = () => {
             <option value="Removed">Removed</option>
           </select>
         )}
+
         <select
           className="border px-3 py-2 rounded-md"
           value={ageFilter}
@@ -279,6 +311,17 @@ const Masterlist = () => {
           <option value="80-89">80–89</option>
           <option value="90+">90+</option>
         </select>
+
+        {/* Sort by name */}
+        <select
+          className="border px-3 py-2 rounded-md"
+          value={nameSort}
+          onChange={(e) => setNameSort(e.target.value)}
+        >
+          <option value="asc">Name A–Z</option>
+          <option value="desc">Name Z–A</option>
+        </select>
+
         <button
           className="border border-gray-400 px-3 py-2 rounded-md"
           onClick={resetFilters}
@@ -299,6 +342,7 @@ const Masterlist = () => {
         >
           Overall List
         </button>
+
         <button
           onClick={() => setActiveTab("pensioners")}
           className={`px-6 py-2 rounded-t-lg font-semibold ${
@@ -309,6 +353,7 @@ const Masterlist = () => {
         >
           Pensioners
         </button>
+
         <button
           onClick={() => setActiveTab("recent")}
           className={`px-6 py-2 rounded-t-lg font-semibold ${
@@ -321,7 +366,7 @@ const Masterlist = () => {
         </button>
       </div>
 
-      {/* ✅ Table */}
+      {/* Table */}
       <div className="overflow-x-auto shadow border border-gray-200 rounded-b-lg">
         {loading ? (
           <p className="p-4 text-center text-gray-500">Loading records...</p>
@@ -347,6 +392,7 @@ const Masterlist = () => {
                 )}
               </tr>
             </thead>
+
             <tbody>
               {filteredRecords.map((row, idx) => (
                 <tr
@@ -357,6 +403,7 @@ const Masterlist = () => {
                   <td className="px-4 py-2 font-mono text-gray-700">
                     {row.seniorId}
                   </td>
+
                   <td className="px-4 py-2 font-medium text-gray-800">
                     {formatFullName(
                       row.surname,
@@ -365,9 +412,11 @@ const Masterlist = () => {
                       row.suffix
                     )}
                   </td>
+
                   <td className="px-4 py-2">{row.birthdayFormatted}</td>
                   <td className="px-4 py-2 text-center">{row.age}</td>
                   <td className="px-4 py-2">{row.barangay}</td>
+
                   <td
                     className={`px-4 py-2 font-medium ${
                       row.status === "Eligible"
@@ -381,6 +430,7 @@ const Masterlist = () => {
                   >
                     {row.status}
                   </td>
+
                   <td
                     className={`px-4 py-2 font-medium ${
                       row.rfidStatus === "Bound"
@@ -390,16 +440,22 @@ const Masterlist = () => {
                   >
                     {row.rfidStatus}
                   </td>
+
                   <td className="px-4 py-2 font-mono text-center">
                     {row.rfidCode}
                   </td>
+
                   <td className="px-4 py-2 text-center font-semibold text-blue-600">
                     {row.quarter}
                   </td>
+
                   <td className="px-4 py-2 text-center">{row.missed}</td>
                   <td className="px-4 py-2 text-center">{row.lastClaim}</td>
+
                   {activeTab === "recent" && (
-                    <td>{row.lastUpdated ? formatDate(row.lastUpdated) : "-"}</td>
+                    <td>
+                      {row.lastUpdated ? formatDate(row.lastUpdated) : "-"}
+                    </td>
                   )}
                 </tr>
               ))}
