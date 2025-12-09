@@ -217,189 +217,212 @@ const Masterlist = () => {
   const toggleSortOrder = () =>
     setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  // ✅ Excel Report
-  const generateReport = async () => {
-    let eligibleBound = records.overall.filter(
-      (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
-    );
+  //  Excel Report
+  // const generateReport = async () => {
+  //   let eligibleBound = records.overall.filter(
+  //     (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
+  //   );
 
-    if (quarterFilter !== "All") {
-      eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
-    }
+  //   if (quarterFilter !== "All") {
+  //     eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
+  //   }
 
-    if (eligibleBound.length === 0) {
-      alert(
-        quarterFilter === "All"
-          ? "No eligible and bound records found."
-          : `No records found for ${quarterFilter}.`
-      );
-      return;
-    }
+  //   if (eligibleBound.length === 0) {
+  //     alert(
+  //       quarterFilter === "All"
+  //         ? "No eligible and bound records found."
+  //         : `No records found for ${quarterFilter}.`
+  //     );
+  //     return;
+  //   }
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(
-      `${quarterFilter === "All" ? "All Quarters" : quarterFilter} Pensioners`
-    );
+  //   const workbook = new ExcelJS.Workbook();
+  //   const worksheet = workbook.addWorksheet(
+  //     `${quarterFilter === "All" ? "All Quarters" : quarterFilter} Pensioners`
+  //   );
 
-    worksheet.columns = Array(11)
-      .fill()
-      .map(() => ({ width: 18 }));
+  //   worksheet.columns = Array(11)
+  //     .fill()
+  //     .map(() => ({ width: 18 }));
 
-    const response = await fetch(dswdlogo);
-    const imageBuffer = await response.arrayBuffer();
-    const imageId = workbook.addImage({ buffer: imageBuffer, extension: "png" });
-    worksheet.addImage(imageId, {
-      tl: { col: 2.5, row: 0.5 },
-      ext: { width: 100, height: 100 },
-    });
+  //   const response = await fetch(dswdlogo);
+  //   const imageBuffer = await response.arrayBuffer();
+  //   const imageId = workbook.addImage({ buffer: imageBuffer, extension: "png" });
+  //   worksheet.addImage(imageId, {
+  //     tl: { col: 2.5, row: 0.5 },
+  //     ext: { width: 100, height: 100 },
+  //   });
 
-    worksheet.mergeCells("C2", "H2");
-    worksheet.getCell("C2").value =
-      "Department of Social Welfare and Development";
-    worksheet.getCell("C2").font = { size: 16, bold: true };
-    worksheet.getCell("C2").alignment = {
-      vertical: "middle",
-      horizontal: "center",
-    };
+  //   worksheet.mergeCells("C2", "H2");
+  //   worksheet.getCell("C2").value =
+  //     "Department of Social Welfare and Development";
+  //   worksheet.getCell("C2").font = { size: 16, bold: true };
+  //   worksheet.getCell("C2").alignment = {
+  //     vertical: "middle",
+  //     horizontal: "center",
+  //   };
 
-    worksheet.addRow([]);
-    worksheet.addRow([]);
-    worksheet.addRow([]);
+  //   worksheet.addRow([]);
+  //   worksheet.addRow([]);
+  //   worksheet.addRow([]);
 
-    const headers = [
-      "ID Number",
-      "Name",
-      "Birthday",
-      "Age",
-      "Barangay",
-      "Status",
-      "RFID Status",
-      "RFID Code",
-      "Quarter",
-      "Missed Consecutive",
-      "Last Claim Date",
-    ];
-    const headerRow = worksheet.addRow(headers);
-    headerRow.eachCell((c) => {
-      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      c.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF2E75B6" },
-      };
-      c.alignment = { vertical: "middle", horizontal: "center" };
-    });
+  //   const headers = [
+  //     "ID Number",
+  //     "Name",
+  //     "Birthday",
+  //     "Age",
+  //     "Barangay",
+  //     "Status",
+  //     "RFID Status",
+  //     "RFID Code",
+  //     "Quarter",
+  //     "Missed Consecutive",
+  //     "Last Claim Date",
+  //   ];
+  //   const headerRow = worksheet.addRow(headers);
+  //   headerRow.eachCell((c) => {
+  //     c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  //     c.fill = {
+  //       type: "pattern",
+  //       pattern: "solid",
+  //       fgColor: { argb: "FF2E75B6" },
+  //     };
+  //     c.alignment = { vertical: "middle", horizontal: "center" };
+  //   });
 
-    eligibleBound.forEach((r) =>
-      worksheet.addRow([
-        r.seniorId,
-        `${r.surname}, ${r.firstName} ${r.middleName || ""} ${r.extName || ""}`,
-        r.birthday,
-        r.age,
-        r.barangay,
-        r.status,
-        r.rfidStatus,
-        r.rfidCode,
-        r.quarter,
-        r.missed,
-        r.lastClaim,
-      ])
-    );
+  //   eligibleBound.forEach((r) =>
+  //     worksheet.addRow([
+  //       r.seniorId,
+  //       `${r.surname}, ${r.firstName} ${r.middleName || ""} ${r.extName || ""}`,
+  //       r.birthday,
+  //       r.age,
+  //       r.barangay,
+  //       r.status,
+  //       r.rfidStatus,
+  //       r.rfidCode,
+  //       r.quarter,
+  //       r.missed,
+  //       r.lastClaim,
+  //     ])
+  //   );
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const today = new Date().toISOString().split("T")[0];
-    saveAs(
-      new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      }),
-      `Pensioners_Report_${quarterFilter}_${today}.xlsx`
-    );
-  };
+  //   const buffer = await workbook.xlsx.writeBuffer();
+  //   const today = new Date().toISOString().split("T")[0];
+  //   saveAs(
+  //     new Blob([buffer], {
+  //       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  //     }),
+  //     `Pensioners_Report_${quarterFilter}_${today}.xlsx`
+  //   );
+  // };
 
-  // ✅ Print Report
+  //  Print Report PDF
   const printReport = () => {
-    let eligibleBound = records.overall.filter(
-      (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
+  let eligibleBound = records.overall.filter(
+    (r) => r.status === "Eligible" && r.rfidStatus === "Bound"
+  );
+
+  // Apply Quarter Filter
+  if (quarterFilter !== "All") {
+    eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
+  }
+
+  // Apply Date Range Filter
+  if (startDate || endDate) {
+    eligibleBound = eligibleBound.filter((r) => {
+      if (!r.lastClaim || r.lastClaim === "Never") return false;
+
+      const claimDate = new Date(r.lastClaim);
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+
+      if (start && end) return claimDate >= start && claimDate <= end;
+      if (start) return claimDate >= start;
+      if (end) return claimDate <= end;
+      return true;
+    });
+  }
+
+  if (eligibleBound.length === 0) {
+    alert(
+      quarterFilter === "All"
+        ? "No eligible and bound records found to print."
+        : `No records found for ${quarterFilter}${
+            startDate || endDate ? " within the selected date range" : ""
+          }.`
     );
-    if (quarterFilter !== "All") {
-      eligibleBound = eligibleBound.filter((r) => r.quarter === quarterFilter);
-    }
-    if (eligibleBound.length === 0) {
-      alert(
-        quarterFilter === "All"
-          ? "No eligible and bound records found to print."
-          : `No records found for ${quarterFilter}.`
-      );
-      return;
-    }
+    return;
+  }
 
-    const printWindow = window.open("", "_blank");
-    const today = new Date().toLocaleDateString();
-    const tableRows = eligibleBound
-      .map(
-        (r) => `
-        <tr>
-          <td>${r.seniorId}</td>
-          <td>${r.surname}, ${r.firstName} ${r.middleName || ""} ${
-          r.extName || ""
-        }</td>
-          <td>${r.birthday}</td>
-          <td>${r.age}</td>
-          <td>${r.barangay}</td>
-          <td>${r.status}</td>
-          <td>${r.rfidStatus}</td>
-          <td>${r.rfidCode}</td>
-          <td>${r.quarter}</td>
-          <td>${r.missed}</td>
-          <td>${r.lastClaim}</td>
-        </tr>`
-      )
-      .join("");
+  const printWindow = window.open("", "_blank");
+  const today = new Date().toLocaleDateString();
+  const tableRows = eligibleBound
+    .map(
+      (r) => `
+      <tr>
+        <td>${r.seniorId}</td>
+        <td>${r.surname}, ${r.firstName} ${r.middleName || ""} ${
+        r.extName || ""
+      }</td>
+        <td>${r.birthday}</td>
+        <td>${r.age}</td>
+        <td>${r.barangay}</td>
+        <td>${r.status}</td>
+        <td>${r.rfidStatus}</td>
+        <td>${r.rfidCode}</td>
+        <td>${r.quarter}</td>
+        <td>${r.missed || 0}</td>
+        <td>${r.lastClaim}</td>
+      </tr>`
+    )
+    .join("");
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Printable Pensioners Report</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1, h3 { text-align: center; margin: 5px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            th, td { border: 1px solid #444; padding: 6px; font-size: 12px; text-align: center; }
-            th { background-color: #2E75B6; color: white; }
-            img { display: block; margin: 0 auto 10px; height: 80px; }
-          </style>
-        </head>
-        <body>
-          <img src="${dswdlogo}" alt="DSWD Logo" />
-          <h1>Department of Social Welfare and Development</h1>
-          <h3>Pensioners Report - ${
-            quarterFilter === "All" ? "All Quarters" : quarterFilter
-          }</h3>
-          <p><strong>Date:</strong> ${today}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>ID Number</th>
-                <th>Name</th>
-                <th>Birthday</th>
-                <th>Age</th>
-                <th>Barangay</th>
-                <th>Status</th>
-                <th>RFID Status</th>
-                <th>RFID Code</th>
-                <th>Quarter</th>
-                <th>Missed</th>
-                <th>Last Claim</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  };
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Printable Pensioners Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1, h3 { text-align: center; margin: 5px 0; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          th, td { border: 1px solid #444; padding: 6px; font-size: 12px; text-align: center; }
+          th { background-color: #2E75B6; color: white; }
+          img { display: block; margin: 0 auto 10px; height: 80px; }
+        </style>
+      </head>
+      <body>
+        <img src="${dswdlogo}" alt="DSWD Logo" />
+        <h1>Department of Social Welfare and Development</h1>
+        <h3>Pensioners Report - ${
+          quarterFilter === "All" ? "All Quarters" : quarterFilter
+        }</h3>
+        <p><strong>Date:</strong> ${today}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>ID Number</th>
+              <th>Name</th>
+              <th>Birthday</th>
+              <th>Age</th>
+              <th>Barangay</th>
+              <th>Status</th>
+              <th>RFID Status</th>
+              <th>RFID Code</th>
+              <th>Quarter</th>
+              <th>Missed</th>
+              <th>Last Claim</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  printWindow.print();
+};
+
   
 
   const [reportType, setReportType] = useState("overall");
@@ -410,7 +433,7 @@ const Masterlist = () => {
 const generateOverallReport = async () => {
   let selectedData = records[reportType] || [];
 
-  // ✅ Optional Date Range Filtering
+  //  Optional Date Range Filtering
   if (startDate || endDate) {
     selectedData = selectedData.filter((r) => {
       if (!r.lastClaim || r.lastClaim === "Never") return false;
@@ -436,7 +459,7 @@ const generateOverallReport = async () => {
     return;
   }
 
-  // ✅ Excel Workbook setup
+  //  Excel Workbook setup
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet(
     `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`
@@ -446,7 +469,7 @@ const generateOverallReport = async () => {
     .fill()
     .map(() => ({ width: 18 }));
 
-  // ✅ Add logo
+  //  Add logo
   const response = await fetch(dswdlogo);
   const imageBuffer = await response.arrayBuffer();
   const imageId = workbook.addImage({ buffer: imageBuffer, extension: "png" });
@@ -455,7 +478,7 @@ const generateOverallReport = async () => {
     ext: { width: 100, height: 100 },
   });
 
-  // ✅ Header Title
+  //  Header Title
   worksheet.mergeCells("C2", "H2");
   worksheet.getCell("C2").value =
     "Department of Social Welfare and Development";
@@ -469,7 +492,7 @@ const generateOverallReport = async () => {
   worksheet.addRow([]);
   worksheet.addRow([]);
 
-  // ✅ Table Headers
+  //  Table Headers
   const headers = [
     "ID Number",
     "Name",
@@ -507,7 +530,7 @@ const generateOverallReport = async () => {
       return;
     }
 
-  // ✅ Add Data Rows
+  //  Add Data Rows
   selectedData.forEach((r) =>
     worksheet.addRow([
       r.seniorId,
@@ -541,24 +564,24 @@ const generateOverallReport = async () => {
 };
 
 // Helper: check if a record date (string) is inside the selected range
-const isWithinDateRange = (recordDate) => {
-  // if no date filter selected -> include all
-  if (!startDate && !endDate) return true;
+// const isWithinDateRange = (recordDate) => {
+//   // if no date filter selected -> include all
+//   if (!startDate && !endDate) return true;
 
-  // if recordDate is "Never" or falsy, treat as excluded
-  if (!recordDate || recordDate === "Never") return false;
+//   // if recordDate is "Never" or falsy, treat as excluded
+//   if (!recordDate || recordDate === "Never") return false;
 
-  const date = new Date(recordDate);
-  if (isNaN(date.getTime())) return false;
+//   const date = new Date(recordDate);
+//   if (isNaN(date.getTime())) return false;
 
-  const start = startDate ? new Date(startDate) : null;
-  const end = endDate ? new Date(endDate) : null;
+//   const start = startDate ? new Date(startDate) : null;
+//   const end = endDate ? new Date(endDate) : null;
 
-  if (start && end) return date >= start && date <= end;
-  if (start) return date >= start;
-  if (end) return date <= end;
-  return true;
-};
+//   if (start && end) return date >= start && date <= end;
+//   if (start) return date >= start;
+//   if (end) return date <= end;
+//   return true;
+// };
 
 
 //  Function: Filter and generate report by date range

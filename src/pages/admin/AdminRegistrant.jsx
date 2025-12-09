@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { rtdb, auth } from "./adminJS/AdminRegistrant.js"; // Firebase RTDB + Auth
 import TalisayLogo from "/src/assets/Talisay-Logo.png";
-import { ref, push, set, get,onValue } from "firebase/database";
+import { ref, push, set, get, onValue } from "firebase/database";
 
 /**
  * AdminRegistrant - Senior Citizen Registration
@@ -13,7 +13,6 @@ import { ref, push, set, get,onValue } from "firebase/database";
  */
 
 /* ----- Helper: Audit + Notification Logging ----- */
-
 const logAudit = async (barangay, action, status, message, userId = "Unknown") => {
   try {
     const logRef = ref(rtdb, `auditLogs/${barangay}`);
@@ -54,7 +53,6 @@ const generateYearlySeniorId = async () => {
   }
 };
 
-/* ----- AdminRegistrant Component ----- */
 const AdminRegistrant = () => {
   const initialForm = {
     firstName: "",
@@ -81,7 +79,7 @@ const AdminRegistrant = () => {
     pensionSource: "",
     monthlyIncome: "",
     occupation: "",
-    birthCertificate: null,
+    birthCertificate: null, // base64 string
     barangayCertificate: null,
     alienCertificate: null,
     passport: null,
@@ -90,7 +88,15 @@ const AdminRegistrant = () => {
   };
 
   const [formData, setFormData] = useState(initialForm);
-  const [profilePreview, setProfilePreview] = useState(null);
+  const [profilePreview, setProfilePreview] = useState(null); // data URL (base64) preview for profile pic
+  const [filePreviews, setFilePreviews] = useState({
+    birthCertificate: null,
+    barangayCertificate: null,
+    alienCertificate: null,
+    passport: null,
+  }); // { name: { file, url } }
+  const [previewFile, setPreviewFile] = useState(null); // object URL to show in modal (pdf/img)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -105,7 +111,10 @@ const AdminRegistrant = () => {
 
   /* ----- Notifications Listener ----- */
   useEffect(() => {
-    if (!formData.barangay) return setNotifications([]);
+    if (!formData.barangay) {
+      setNotifications([]);
+      return;
+    }
     const notifRef = ref(rtdb, `notifications/${formData.barangay}`);
     const unsubscribe = onValue(notifRef, (snapshot) => {
       const data = snapshot.val() || {};
@@ -130,59 +139,87 @@ const AdminRegistrant = () => {
     const today = new Date();
     const b = new Date(birthdate);
     let age = today.getFullYear() - b.getFullYear();
-    if (today.getMonth() < b.getMonth() || (today.getMonth() === b.getMonth() && today.getDate() < b.getDate())) age--;
+    if (today.getMonth() < b.getMonth() || (today.getMonth() === b.getMonth() && today.getDate() < b.getDate()))
+      age--;
     return age;
   };
 
-  /* Handle input changes including file uploads */
+  /* Single unified handleChange for input and files */
   const handleChange = async (e) => {
-  const { name, value, type, checked, files } = e.target;
+    const { name, type, checked, value, files } = e.target;
 
-  // File uploads
-  if (type === "file" && files[0]) {
-    try {
-      const base64 = await convertToBase64(files[0]);
-      setFormData((prev) => ({ ...prev, [name]: base64 }));
-      if (name === "profilePicture") setProfilePreview(base64);
-    } catch (err) {
-      console.error("File read error:", err);
+    // Checkbox
+    if (type === "checkbox") {
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+      return;
     }
-    return;
-  }
 
-  // Checkbox
-  if (type === "checkbox") {
-    setFormData((prev) => ({ ...prev, [name]: checked }));
-    return;
-  }
+    // File input
+    if (type === "file") {
+      const file = files && files[0];
+      if (!file) return;
 
-  // 💰 Format amount fields with comma separators
-  if (name === "monthlyPension" || name === "monthlyIncome") {
-    const numericValue = value.replace(/[^\d]/g, ""); // remove non-numeric chars
-    const formatted = numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ","); // add commas
-    setFormData((prev) => ({ ...prev, [name]: formatted }));
-    return;
-  }
+      // Validate file type
+      const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+      if (!allowedTypes.includes(file.type)) {
+        alert("Invalid file type. Allowed: PDF, JPG, PNG.");
+        // clear input
+        e.target.value = "";
+        return;
+      }
 
-  // Default
-  setFormData((prev) => ({ ...prev, [name]: value }));
-};
+      // Validate file size (5MB)
+      const maxBytes = 5 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        alert("File is too large. Maximum allowed size is 5MB.");
+        e.target.value = "";
+        return;
+      }
 
+      try {
+        // store base64 in formData for saving to RTDB
+        const base64 = await convertToBase64(file);
+        setFormData((prev) => ({ ...prev, [name]: base64 }));
 
-  /* Number-only input helper */
+        // also keep a quick preview url to view the file in modal
+        const url = URL.createObjectURL(file);
+        setFilePreviews((prev) => ({ ...prev, [name]: { file, url } }));
+
+        // if profilePicture, also set profile thumbnail (uses base64)
+        if (name === "profilePicture") setProfilePreview(base64);
+      } catch (err) {
+        console.error("File read error:", err);
+        alert("Failed to read file.");
+      }
+      return;
+    }
+
+    // Monetary formatting stored as plain digits in state (strip non-digits)
+    if (name === "monthlyPension" || name === "monthlyIncome") {
+      const numericValue = value.replace(/[^\d]/g, "");
+      setFormData((prev) => ({ ...prev, [name]: numericValue }));
+      return;
+    }
+
+    // Number-only fields (e.g., contactNumber) handled elsewhere via onInput, but keep fallback:
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  /* Number-only input helper (used inline) */
   const handleNumberInput = (e) => {
     const value = e.target.value.replace(/\D/g, "");
     if (value.length <= 11) setFormData((prev) => ({ ...prev, [e.target.name]: value }));
   };
 
-  /* Auto-generate Senior ID */
+  /* Auto-generate Senior ID (on mount) */
   useEffect(() => {
-    if (!formData.seniorId) {
-      (async () => {
+    (async () => {
+      if (!formData.seniorId) {
         const id = await generateYearlySeniorId();
         setFormData((prev) => ({ ...prev, seniorId: id }));
-      })();
-    }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ----- Submit Handler ----- */
@@ -193,16 +230,23 @@ const AdminRegistrant = () => {
     const age = computeAge(formData.dateOfBirth);
 
     // Basic Validations
-    if (!formData.firstName || !formData.lastName) { alert("Please fill out first and last name."); setLoading(false); return; }
-    if (!formData.dateOfBirth) { alert("Please select date of birth."); setLoading(false); return; }
-    if (age < 60) { 
-      alert("Only senior citizens aged 60+ can be registered."); 
-      await logAudit(formData.barangay || "unknown", "REGISTER_SENIOR", "ERROR", "Age below 60", currentUser?.uid); 
-      setLoading(false); 
-      return; 
+    if (!formData.firstName || !formData.lastName) {
+      alert("Please fill out first and last name.");
+      setLoading(false);
+      return;
+    }
+    if (!formData.dateOfBirth) {
+      alert("Please select date of birth.");
+      setLoading(false);
+      return;
+    }
+    if (age < 60) {
+      alert("Only senior citizens aged 60+ can be registered.");
+      await logAudit(formData.barangay || "unknown", "REGISTER_SENIOR", "ERROR", "Age below 60", currentUser?.uid);
+      setLoading(false);
+      return;
     }
 
-    let seniorId = formData.seniorId || await generateYearlySeniorId();
     const contactRegex = /^(09\d{9}|\+639\d{9})$/;
     if (!contactRegex.test(formData.contactNumber)) {
       alert("Please enter a valid Philippine contact number.");
@@ -210,13 +254,22 @@ const AdminRegistrant = () => {
       setLoading(false);
       return;
     }
-    if (!formData.barangay) { alert("Please select a barangay."); setLoading(false); return; }
-    if (!formData.consent) { alert("Consent is required."); setLoading(false); return; }
+    if (!formData.barangay) {
+      alert("Please select a barangay.");
+      setLoading(false);
+      return;
+    }
+    if (!formData.consent) {
+      alert("Consent is required.");
+      setLoading(false);
+      return;
+    }
 
-    // Push data
     try {
       const now = new Date().toISOString();
-      const payload = { ...formData, seniorId, age, createdAt: now, updatedAt: now };
+      // leave monthlyPension/monthlyIncome as raw numeric strings (no commas)
+      const payload = { ...formData, age, createdAt: now, updatedAt: now };
+
       await push(ref(rtdb, "senior_citizens"), payload);
 
       await logAudit(
@@ -228,8 +281,17 @@ const AdminRegistrant = () => {
       );
 
       alert("Senior Citizen registration saved successfully!");
+
+      // Reset form + previews + file inputs
       setFormData(initialForm);
       setProfilePreview(null);
+      setFilePreviews({
+        birthCertificate: null,
+        barangayCertificate: null,
+        alienCertificate: null,
+        passport: null,
+      });
+      // clear file inputs visually
       document.querySelectorAll('input[type="file"]').forEach((input) => (input.value = ""));
     } catch (err) {
       console.error(err);
@@ -244,9 +306,63 @@ const AdminRegistrant = () => {
     if (window.confirm("Cancel registration? All data will be lost.")) {
       setFormData(initialForm);
       setProfilePreview(null);
+      setFilePreviews({
+        birthCertificate: null,
+        barangayCertificate: null,
+        alienCertificate: null,
+        passport: null,
+      });
       document.querySelectorAll('input[type="file"]').forEach((input) => (input.value = ""));
     }
   };
+
+  /* ----- Small reusable DocumentInput component ----- */
+  const DocumentInput = ({ label, name, required = false }) => (
+    <div>
+      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+
+      <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
+
+      <input
+        type="file"
+        id={name}
+        name={name}
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        required={required}
+      />
+
+      {filePreviews[name] && (
+        <div className="mt-2 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewFile(filePreviews[name].url);
+              setIsPreviewOpen(true);
+            }}
+            className="text-blue-600 underline text-sm"
+          >
+            View Document
+          </button>
+
+          <label className="text-sm text-gray-600 underline cursor-pointer">
+            Change File
+            <input
+              type="file"
+              name={name}
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleChange}
+              className="hidden"
+            />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
   /* ---------- Render ---------- */
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
@@ -328,7 +444,6 @@ const AdminRegistrant = () => {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white"
               >
-
                 <option value="">Select Suffix</option>
                 <option value="Jr.">Jr.</option>
                 <option value="Sr.">Sr.</option>
@@ -340,8 +455,7 @@ const AdminRegistrant = () => {
               </select>
             </div>
 
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700 mb-1">Date of Birth <span className="text-red-500">*</span></label>
                 <input type="date" id="dateOfBirth" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required />
@@ -371,27 +485,10 @@ const AdminRegistrant = () => {
               </div>
 
               <div>
-                <label
-                  htmlFor="seniorId"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Senior Citizen ID Number <span className="text-red-500">*</span>
-                </label>
-
-                <input
-                  type="text"
-                  id="seniorId"
-                  name="seniorId"
-                  value={formData.seniorId}
-                  readOnly
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100"
-                />
-
-                <p className="text-xs text-gray-500 mt-1">
-                  Auto-generated format: YY-### (e.g., 25-123)
-                </p>
-            </div>
-              
+                <label htmlFor="seniorId" className="block text-sm font-medium text-gray-700 mb-1">Senior Citizen ID Number <span className="text-red-500">*</span></label>
+                <input type="text" id="seniorId" name="seniorId" value={formData.seniorId} readOnly className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100" />
+                <p className="text-xs text-gray-500 mt-1">Auto-generated format: YY-### (e.g., 25-123)</p>
+              </div>
             </div>
 
             <div>
@@ -524,15 +621,7 @@ const AdminRegistrant = () => {
                       ? Number(formData.monthlyPension).toLocaleString("en-PH")
                       : ""
                   }
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/,/g, "");
-                    if (!isNaN(rawValue)) {
-                      setFormData({
-                        ...formData,
-                        monthlyPension: rawValue,
-                      });
-                    }
-                  }}
+                  onChange={handleChange}
                 />
               </div>
 
@@ -566,15 +655,7 @@ const AdminRegistrant = () => {
                       ? Number(formData.monthlyIncome).toLocaleString("en-PH")
                       : ""
                   }
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/,/g, "");
-                    if (!isNaN(rawValue)) {
-                      setFormData({
-                        ...formData,
-                        monthlyIncome: rawValue,
-                      });
-                    }
-                  }}
+                  onChange={handleChange}
                 />
               </div>
 
@@ -595,43 +676,192 @@ const AdminRegistrant = () => {
             </div>
           </div>
 
-
           {/* Required Documents */}
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">Required Documents</h2>
+  <h2 className="text-xl font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+    Required Documents
+  </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="birthCertificate" className="block text-sm font-medium text-gray-700 mb-1">Upload Birth Certificate <span className="text-red-500">*</span></label>
-                <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
-                <input type="file" id="birthCertificate" name="birthCertificate" accept=".pdf,.jpg,.png" onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md" required />
-              </div>
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {/* Birth Certificate */}
+    <div>
+      <label htmlFor="birthCertificate" className="block text-sm font-medium text-gray-700 mb-1">
+        Upload Birth Certificate <span className="text-red-500">*</span>
+      </label>
+      <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
+      <input
+        type="file"
+        id="birthCertificate"
+        name="birthCertificate"
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        required
+      />
+      {filePreviews.birthCertificate && (
+        <div className="mt-2 flex items-center gap-4">
+          <span className="text-sm text-gray-700">{filePreviews.birthCertificate.file.name}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewFile(filePreviews.birthCertificate.url);
+              setIsPreviewOpen(true);
+            }}
+            className="text-blue-600 underline text-sm"
+          >
+            View Document
+          </button>
+          <label className="text-sm text-blue-600 underline cursor-pointer">
+            <input
+              type="file"
+              name="birthCertificate"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleChange}
+              className="hidden"
+            />
+            Change File
+          </label>
+        </div>
+      )}
+    </div>
 
-              <div>
-                <label htmlFor="barangayCertificate" className="block text-sm font-medium text-gray-700 mb-1">Upload Valid I.D <span className="text-red-500">*</span></label>
-                <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
-                <input type="file" id="barangayCertificate" name="barangayCertificate" accept=".pdf,.jpg,.png" onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md" required />
-              </div>
-            </div>
+    {/* Barangay Certificate */}
+    <div>
+      <label htmlFor="barangayCertificate" className="block text-sm font-medium text-gray-700 mb-1">
+        Upload Valid I.D <span className="text-red-500">*</span>
+      </label>
+      <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
+      <input
+        type="file"
+        id="barangayCertificate"
+        name="barangayCertificate"
+        accept=".pdf,.jpg,.jpeg,.png"
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        required
+      />
+      {filePreviews.barangayCertificate && (
+        <div className="mt-2 flex items-center gap-4">
+          <span className="text-sm text-gray-700">{filePreviews.barangayCertificate.file.name}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPreviewFile(filePreviews.barangayCertificate.url);
+              setIsPreviewOpen(true);
+            }}
+            className="text-blue-600 underline text-sm"
+          >
+            View Document
+          </button>
+          <label className="text-sm text-blue-600 underline cursor-pointer">
+            <input
+              type="file"
+              name="barangayCertificate"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleChange}
+              className="hidden"
+            />
+            Change File
+          </label>
+        </div>
+      )}
+    </div>
+  </div>
 
-            <div className="mt-8 bg-gray-50 border border-gray-200 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">For Foreign Nationals <span className="text-gray-500 text-sm">(Optional)</span></h3>
+  {/* Foreign Nationals Section */}
+  <div className="mt-8 bg-gray-50 border border-gray-200 rounded-xl p-6">
+    <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">
+      For Foreign Nationals <span className="text-gray-500 text-sm">(Optional)</span>
+    </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="alienCertificate" className="block text-sm font-medium text-gray-700 mb-1">Upload Additional Naturalization Paper</label>
-                  <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
-                  <input type="file" id="alienCertificate" name="alienCertificate" accept=".pdf,.jpg,.png" onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-                </div>
-
-                <div>
-                  <label htmlFor="passport" className="block text-sm font-medium text-gray-700 mb-1">Upload Valid Passport</label>
-                  <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
-                  <input type="file" id="passport" name="passport" accept=".pdf,.jpg,.png" onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-                </div>
-              </div>
-            </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Alien Certificate */}
+      <div>
+        <label htmlFor="alienCertificate" className="block text-sm font-medium text-gray-700 mb-1">
+          Upload Additional Naturalization Paper
+        </label>
+        <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
+        <input
+          type="file"
+          id="alienCertificate"
+          name="alienCertificate"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        />
+        {filePreviews.alienCertificate && (
+          <div className="mt-2 flex items-center gap-4">
+            <span className="text-sm text-gray-700">{filePreviews.alienCertificate.file.name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewFile(filePreviews.alienCertificate.url);
+                setIsPreviewOpen(true);
+              }}
+              className="text-blue-600 underline text-sm"
+            >
+              View Document
+            </button>
+            <label className="text-sm text-blue-600 underline cursor-pointer">
+              <input
+                type="file"
+                name="alienCertificate"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleChange}
+                className="hidden"
+              />
+              Change File
+            </label>
           </div>
+        )}
+      </div>
+
+      {/* Passport */}
+      <div>
+        <label htmlFor="passport" className="block text-sm font-medium text-gray-700 mb-1">
+          Upload Valid Passport
+        </label>
+        <p className="text-sm text-gray-500 mb-2">PDF, JPG or PNG (Max 5MB)</p>
+        <input
+          type="file"
+          id="passport"
+          name="passport"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        />
+        {filePreviews.passport && (
+          <div className="mt-2 flex items-center gap-4">
+            <span className="text-sm text-gray-700">{filePreviews.passport.file.name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewFile(filePreviews.passport.url);
+                setIsPreviewOpen(true);
+              }}
+              className="text-blue-600 underline text-sm"
+            >
+              View Document
+            </button>
+            <label className="text-sm text-blue-600 underline cursor-pointer">
+              <input
+                type="file"
+                name="passport"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleChange}
+                className="hidden"
+              />
+              Change File
+            </label>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
 
           {/* Consent & Compliance */}
           <div className="p-6">
@@ -653,6 +883,20 @@ const AdminRegistrant = () => {
             <button type="submit" disabled={loading} className="w-full sm:w-auto px-6 py-2 text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">{loading ? "Saving..." : "Register Senior Citizen"}</button>
           </div>
         </form>
+
+        {/* Document preview modal */}
+        {isPreviewOpen && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full relative">
+              <button className="absolute top-3 right-3 text-gray-600 hover:text-black" onClick={() => setIsPreviewOpen(false)}>✕</button>
+              <h2 className="text-lg font-semibold mb-4">Document Preview</h2>
+              {previewFile && (
+                // iframe can show PDF or image; images will render as a document as well in many browsers
+                <iframe src={previewFile} className="w-full h-[70vh] border rounded-md" title="Document Preview"></iframe>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Notifications list (simple display) */}
         {notifications.length > 0 && (

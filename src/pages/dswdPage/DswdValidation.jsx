@@ -71,7 +71,7 @@ const DswdValidation = () => {
     title: "",
   });
 
-  // 🧩 Fetch and Merge Data from Firebase
+  //  Fetch and Merge Data from Firebase
   useEffect(() => {
     console.log("🔍 Initializing Firebase Realtime Database fetch...");
     const seniorsRef = ref(rtdb, "senior_citizens");
@@ -172,10 +172,10 @@ const DswdValidation = () => {
     };
   }, []);
 
-  // 🧠 Filtering Logic
+  //  Filtering Logic
   useEffect(() => {
     if (loading) return;
-    console.log("🔍 Applying filters...");
+    console.log(" Applying filters...");
     let data = [...records];
 
     if (search.trim() !== "")
@@ -191,19 +191,19 @@ const DswdValidation = () => {
     if (statusFilter !== "All Statuses")
       data = data.filter((row) => row.validationStatus === statusFilter);
 
-    console.log("✅ Filtered Data:", data.length);
+    console.log(" Filtered Data:", data.length);
     setFilteredData(data);
   }, [search, barangayFilter, statusFilter, records, loading]);
 
   // Reset Filters
   const resetFilters = () => {
-    console.log("🔄 Resetting filters...");
+    console.log(" Resetting filters...");
     setSearch("");
     setBarangayFilter("All Barangays");
     setStatusFilter("All Statuses");
   };
 
-  // ✅ Validation Action
+  //  Validation Action
   const handleValidation = async (status) => {
     if (!selectedRecord) return;
 
@@ -228,7 +228,7 @@ const DswdValidation = () => {
         type: status === "Eligible" ? "success" : "info",
       });
 
-      alert(`✅ Successfully marked as ${status}.`);
+      alert(` Successfully marked as ${status}.`);
       setSelectedRecord(null);
     } catch (error) {
       console.error("❌ Failed to update record:", error);
@@ -238,16 +238,16 @@ const DswdValidation = () => {
 
   // 🔍 Document Modal Controls
   const openDocumentModal = (url, title) => {
-    console.log("📄 Opening Document:", title, url);
+    console.log(" Opening Document:", title, url);
     setDocumentModal({ show: true, url, title });
   };
 
   const closeDocumentModal = () => {
-    console.log("❌ Closing Document Modal");
+    console.log(" Closing Document Modal");
     setDocumentModal({ show: false, url: "", title: "" });
   };
 
-  // 🧾 Render UI
+  //  Render UI
   return (
     <div className="p-4 w-full overflow-x-auto">
       <h2 className="text-2xl font-bold mb-1">Validation</h2>
